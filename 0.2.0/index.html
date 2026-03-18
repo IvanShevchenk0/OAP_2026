@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8" />
+    <title>Варіант 12 - Особистий кабінет</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="app.js" defer></script>
+</head>
+<body>
+
+    <div id="loginScreen" class="login-modal">
+        <div class="login-box">
+            <h2 id="modalTitle" style="text-align: center; color: #3528a8; margin-top: 0;">Вхід в систему</h2>
+            
+            <div class="field" id="nameField" style="display: none;">
+                <input id="loginName" type="text" placeholder="Введіть ваше ім'я" />
+            </div>
+
+            <div class="field">
+                <input id="loginEmail" type="text" placeholder="Введіть email" />
+                <p class="error-text" id="loginEmailError"></p>
+            </div>
+            <div class="field">
+                <input id="loginPassword" type="password" placeholder="Введіть пароль" />
+            </div>
+
+            <button id="actionBtn" class="primary-btn" style="width: 100%; margin-top: 10px;">Увійти</button>
+
+            <div style="text-align: center; margin-top: 15px;">
+                <a href="#" id="toggleAuthMode" style="color: #3528a8; text-decoration: none; font-size: 14px;">Немає акаунту? Зареєструватися</a>
+            </div>
+
+            <hr style="margin: 15px 0; border-top: 1px solid #ddd;">
+
+            <div style="text-align: center;">
+                <a href="#" id="guestBtn" style="color: #666; text-decoration: none; font-size: 14px; font-weight: bold;">Увійти як гість</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboardScreen">
+        <header>
+            <h1>Реєстр програмного забезпечення (Варіант 12)</h1>
+            <div class="user-info">
+                <span id="userEmailDisplay"></span>
+                <button id="logoutBtn" class="logout-btn">Вийти</button>
+            </div>
+        </header>
+
+        <main class="container">
+            <section class="form-section hide-for-guest">
+                <h2 id="formTitle">Додати ПЗ</h2>
+                <form id="createForm">
+                    <div class="field">
+                        <label for="nameInput">Name</label>
+                        <input id="nameInput" type="text" />
+                    </div>
+                    <div class="field">
+                        <label for="versionInput">Version</label>
+                        <input id="versionInput" type="text" />
+                    </div>
+                    <div class="field">
+                        <label for="licenseSelect">License Type</label>
+                        <select id="licenseSelect">
+                            <option value="">Оберіть ліцензію</option>
+                            <option value="Free">Free</option>
+                            <option value="Commercial">Commercial</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="seatsInput">Seats</label>
+                        <input id="seatsInput" type="number" />
+                    </div>
+                    <div class="field">
+                        <label for="commentInput">Comment</label>
+                        <textarea id="commentInput" rows="3"></textarea>
+                    </div>
+                    <div class="buttons">
+                        <button type="submit" id="submitBtn" class="primary-btn">Додати</button>
+                        <button type="button" id="saveBtn" class="primary-btn" style="display: none; background-color: #2e7d32; border-color: #2e7d32;">Зберегти</button>
+                        <button type="button" id="resetBtn">Очистити</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="table-section">
+                <h2>Список ПЗ</h2>
+                <div class="filter-bar" style="margin-bottom:12px; display:flex; gap:12px; align-items:center;">
+                    <input id="searchInput" type="text" placeholder="Пошук за назвою..." style="padding:6px; width:200px;">
+                    <select id="licenseFilter" style="padding:6px;">
+                        <option value="">Всі ліцензії</option>
+                        <option value="Free">Free</option>
+                        <option value="Commercial">Commercial</option>
+                    </select>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Назва</th>
+                            <th>Версія</th>
+                            <th>Ліцензія</th>
+                            <th>Місця</th>
+                            <th>Коментар</th>
+                            <th class="action-column">Дія</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody"></tbody>
+                </table>
+            </section>
+        </main>
+
+        <hr>
+
+        <header>
+            <h1>Користувачі (Users)</h1>
+        </header>
+
+        <main class="container">
+            <section class="form-section admin-only">
+                <h2 id="userFormTitle">Додати користувача</h2>
+                <form id="userForm">
+                    <div class="field">
+                        <label for="userNameInput">Ім'я (Name)</label>
+                        <input id="userNameInput" type="text" />
+                    </div>
+                    <div class="field">
+                        <label for="userEmailInput">Email</label>
+                        <input id="userEmailInput" type="text" />
+                        <p class="error-text" id="userEmailError"></p>
+                    </div>
+                    <div class="field">
+                        <label for="userRoleSelect">Роль (Role)</label>
+                        <select id="userRoleSelect">
+                            <option value="">Оберіть роль</option>
+                            <option value="admin">Admin</option>
+                            <option value="user">User</option>
+                        </select>
+                    </div>
+                    <div class="buttons">
+                        <button type="submit" id="userSubmitBtn" class="primary-btn">Додати</button>
+                        <button type="button" id="userSaveBtn" class="primary-btn" style="display: none; background-color: #2e7d32; border-color: #2e7d32;">Зберегти</button>
+                        <button type="button" id="userResetBtn">Очистити</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="table-section">
+                <h2>Список користувачів</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ім'я</th>
+                            <th>Email</th>
+                            <th>Роль</th>
+                            <th class="action-column">Дія</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody"></tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+</body>
+</html>
