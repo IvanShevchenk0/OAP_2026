@@ -10,8 +10,13 @@ export const softwareController = {
             const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
             const pageSize = req.query.pageSize ? parseInt(req.query.pageSize as string, 10) : undefined;
 
-            // Передаємо параметри в сервіс
-            const result = softwareService.getAll({ license, page, pageSize });
+            // Передаємо параметри в сервіс, тільки якщо вони визначені
+            const query: any = {};
+            if (license) query.license = license;
+            if (page !== undefined) query.page = page;
+            if (pageSize !== undefined) query.pageSize = pageSize;
+
+            const result = softwareService.getAll(query);
             res.status(200).json(result); // 200 OK
         } catch (error) {
             next(error);

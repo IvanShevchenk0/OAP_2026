@@ -1,0 +1,27 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+
+# SQLite database file
+0.3.0/backend/data/database.db
+
+# Temporary files
+*.tmp
+*.log
+
+# VS Code settings
+.vscode/
