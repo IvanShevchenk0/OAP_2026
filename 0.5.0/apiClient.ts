@@ -1,7 +1,3 @@
-/**
- * Типізована оболонка для викликів API з фронтенду.
- * Використовує AbortController для таймаутів/скасування та нормалізовані помилки у стилі ProblemDetails.
- */
 export interface ApiProblem {
     status: number;
     title: string;
@@ -30,8 +26,8 @@ const defaultHeaders: Record<string, string> = {
 };
 
 async function parseResponse<T>(response: Response): Promise<T> {
-    const contentType = response.headers.get('content-type') || '';
     let payload: any = null;
+    const contentType = response.headers.get('content-type') || '';
 
     if (contentType.includes('application/json')) {
         try {
@@ -46,7 +42,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
     }
 
     const errorBody = payload && payload.error ? payload.error : payload;
-    const problem: ApiProblem = {
+    throw new ApiClientError({
         status: response.status,
         title: errorBody?.title || errorBody?.code || response.statusText || 'ERROR',
         detail: errorBody?.detail || errorBody?.message || response.statusText || 'Server error',
@@ -55,22 +51,15 @@ async function parseResponse<T>(response: Response): Promise<T> {
             : Array.isArray(errorBody?.details)
             ? errorBody.details
             : []
-    };
-
-    throw new ApiClientError(problem);
+    });
 }
 
 function getAuthHeaders(): Record<string, string> {
-    // Додаємо демо-ідентифікатор користувача до кожного запиту
     const currentUserId = sessionStorage.getItem('currentUserId') || 'guest';
     return { 'X-Demo-UserId': currentUserId };
 }
 
-async function request<T>(
-    url: string | URL,
-    options: RequestInit = {},
-    timeoutMs = 12000
-): Promise<T> {
+async function request<T>(url: string | URL, options: RequestInit = {}, timeoutMs = 12000): Promise<T> {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
@@ -90,7 +79,7 @@ async function request<T>(
             throw new ApiClientError({
                 status: 0,
                 title: 'REQUEST_ABORTED',
-                detail: 'Запит виконано не вдалося через таймаут або скасування',
+                detail: 'Запит не виконано через таймаут або скасування',
                 errors: []
             });
         }
