@@ -1,0 +1,106 @@
+/* БАЗОВІ СТИЛІ */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f5f5f5;
+    margin: 0;
+    padding: 0;
+}
+
+/* МОДАЛЬНЕ ВІКНО ВХОДУ */
+.login-modal {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: fixed; 
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.6); 
+    backdrop-filter: blur(4px); 
+    z-index: 1000;
+}
+
+.login-box {
+    background-color: #fff;
+    padding: 40px;
+    border: 2px solid #3528a8;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    width: 350px;
+}
+
+/* ШАПКА ТА ОСОБИСТИЙ КАБІНЕТ */
+header {
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.user-info {
+    margin-top: 15px;
+    margin-bottom: 30px;
+}
+
+.user-info span {
+    border: 2px solid #3528a8;
+    color: #3528a8;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    background-color: white;
+    margin-right: 15px;
+}
+
+/* СІТКА (ФОРМА ЗЛІВА, ТАБЛИЦЯ СПРАВА) */
+.container {
+    display: flex;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    align-items: flex-start;
+}
+
+.form-section, .table-section {
+    background-color: #ffffff;
+    padding: 15px;
+    border: 1px solid #3528a8;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+.form-section { flex: 1; min-width: 300px; }
+.table-section { flex: 2; min-width: 600px; }
+
+/* ПОЛЯ ВВОДУ */
+.field { margin-bottom: 12px; text-align: left; }
+.field label { display: block; font-weight: bold; margin-bottom: 4px; }
+.field input, .field select, .field textarea {
+    width: 100%; padding: 8px;
+    border: 1px solid #3528a8; border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.error-text { color: #cc0000; font-size: 12px; margin-top: 4px; min-height: 14px; }
+
+/* ТАБЛИЦІ */
+table { width: 100%; border-collapse: collapse; }
+th, td { border: 1px solid #3528a8; padding: 8px; text-align: left; }
+th { background-color: #eeeeee; }
+
+/* КНОПКИ */
+.buttons { display: flex; gap: 8px; margin-top: 12px; }
+button {
+    padding: 8px 12px; cursor: pointer;
+    border: 1px solid #3528a8; background-color: #f9f9f9;
+    border-radius: 4px; font-weight: bold;
+}
+
+.primary-btn { background-color: #3528a8; color: white; }
+.logout-btn { color: red; border-color: red; background: white; }
+
+hr { border: none; border-top: 1px dashed #3528a8; margin: 40px auto; max-width: 1200px; }
+
+/* Заборона зміни розміру для всіх текстових областей */
+textarea {
+    resize: none;
+}
