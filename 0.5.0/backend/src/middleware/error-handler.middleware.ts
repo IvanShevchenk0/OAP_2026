@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 
+// Узгоджена структура помилок API: кидати `new ApiError(status, code, message, details?)`
 export class ApiError extends Error {
     constructor(
         public status: number,
@@ -11,6 +12,8 @@ export class ApiError extends Error {
     }
 }
 
+// Центральний обробник помилок Express. Повертає структуровану JSON відповідь
+// для ApiError, або 500 для невідомих помилок.
 export const errorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
     if (err instanceof ApiError) {
         return res.status(err.status).json({
@@ -21,6 +24,7 @@ export const errorHandler = (err: any, req: Request, res: Response, next: NextFu
         });
     }
 
+    // Логування для розробки; не виводити деталі клієнту
     console.error("Unhandled error:", err);
     return res.status(500).json({
         status: 500,

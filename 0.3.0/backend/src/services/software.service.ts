@@ -1,4 +1,6 @@
 import { softwareRepository } from '../repositories/software.repository';
+import { categoriesRepository } from '../repositories/categories.repository';
+import { usersRepository } from '../repositories/users.repository';
 import { CreateSoftwareDto, UpdateSoftwareDto, Software } from '../dtos/software.dto';
 import { ApiError } from '../middleware/error-handler.middleware';
 
@@ -34,6 +36,70 @@ export const softwareService = {
 
     getSummary: async () => {
         return softwareRepository.getSummary();
+    },
+
+    exportData: async (query?: { license?: string | undefined }) => {
+        return softwareRepository.getExportData({ license: query?.license });
+    },
+
+    importItems: async (items: unknown): Promise<Software[]> => {
+        if (!Array.isArray(items)) {
+            throw new ApiError(400, 'VALIDATION_ERROR', 'Очікується масив items для імпорту');
+        }
+
+        if (items.length > 10) {
+            throw new ApiError(400, 'VALIDATION_ERROR', 'Максимум 10 елементів можна імпортувати за раз');
+        }
+
+        const seen = new Set<string>();
+        const created: Software[] = [];
+
+        for (const [index, rawItem] of items.entries()) {
+            if (typeof rawItem !== 'object' || rawItem === null) {
+                throw new ApiError(400, 'VALIDATION_ERROR', `Елемент ${index} повинен бути об'єктом`);
+            }
+
+            const dto: CreateSoftwareDto = {
+                name: (rawItem as any).name as string,
+                version: (rawItem as any).version as string,
+                license: (rawItem as any).license as string,
+                seats: Number((rawItem as any).seats),
+                comment: typeof (rawItem as any).comment === 'string' ? (rawItem as any).comment : '',
+                ownerId: typeof (rawItem as any).ownerId === 'string' ? (rawItem as any).ownerId : null,
+                categoryId: typeof (rawItem as any).categoryId === 'string' ? (rawItem as any).categoryId : null,
+            };
+
+            validateSoftwareDto(dto);
+
+            const uniqueKey = `${dto.name.trim().toLowerCase()}|${dto.version.trim().toLowerCase()}`;
+            if (seen.has(uniqueKey)) {
+                throw new ApiError(400, 'VALIDATION_ERROR', `Дубликат у запиті імпорту: '${dto.name}' версія '${dto.version}'`);
+            }
+            seen.add(uniqueKey);
+
+            if (await softwareRepository.existsByNameAndVersion(dto.name, dto.version)) {
+                throw new ApiError(409, 'CONFLICT', `ПЗ з назвою '${dto.name}' та версією '${dto.version}' вже існує`);
+            }
+
+            if (dto.ownerId) {
+                const owner = await usersRepository.getById(dto.ownerId);
+                if (!owner) {
+                    throw new ApiError(400, 'VALIDATION_ERROR', `Власник з id ${dto.ownerId} не знайдено`);
+                }
+            }
+
+            if (dto.categoryId) {
+                const category = await categoriesRepository.getById(dto.categoryId);
+                if (!category) {
+                    throw new ApiError(400, 'VALIDATION_ERROR', `Категорію з id ${dto.categoryId} не знайдено`);
+                }
+            }
+
+            const createdItem = await softwareRepository.add(dto);
+            created.push(createdItem);
+        }
+
+        return created;
     },
 
     // Unsafe search delegated to repository (demonstration only)

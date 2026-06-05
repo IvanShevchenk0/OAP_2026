@@ -4,6 +4,8 @@
 // Зв'язок з users реалізовано через owner_id (foreign key).
 import { v4 as uuidv4 } from 'uuid';
 import { Software, CreateSoftwareDto, UpdateSoftwareDto } from '../dtos/software.dto';
+import { Category } from '../dtos/category.dto';
+import { User } from '../dtos/users.dto';
 import db from '../db';
 
 const ALLOWED_SORT_COLUMNS = new Set(['name', 'version', 'license', 'seats']);
@@ -44,6 +46,75 @@ export const softwareRepository = {
         const stmt = await db.prepare('SELECT COUNT(*) as total, SUM(seats) as sumSeats, AVG(seats) as avgSeats FROM software');
         const row = stmt.get();
         return { total: row?.total || 0, sumSeats: row?.sumSeats || 0, avgSeats: row?.avgSeats || 0 };
+    },
+
+    getExportData: async (options?: { license?: string | undefined }) => {
+        const where: string[] = [];
+        const params: any[] = [];
+
+        if (options?.license) {
+            where.push('s.license = ?');
+            params.push(options.license);
+        }
+
+        const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+        const totalStmt = await db.prepare(`SELECT COUNT(*) as cnt FROM software s ${whereSql}`);
+        const totalRow = totalStmt.get(...params) as any;
+        const total = totalRow ? totalRow.cnt as number : 0;
+
+        const sql = `SELECT s.id as software_id, s.name as software_name, s.version as software_version, s.license as software_license,
+            s.seats as software_seats, s.comment as software_comment, s.owner_id as software_owner_id, s.category_id as software_category_id,
+            c.id as category_id, c.name as category_name, c.platform as category_platform,
+            u.id as user_id, u.name as user_name, u.email as user_email, u.role as user_role
+          FROM software s
+          LEFT JOIN categories c ON s.category_id = c.id
+          LEFT JOIN users u ON s.owner_id = u.id
+          ${whereSql}`;
+
+        const stmt = await db.prepare(sql);
+        const rows = stmt.all(...params) as any[];
+
+        const items = rows.map(row => {
+            const software: Software = {
+                id: row.software_id,
+                name: row.software_name,
+                version: row.software_version,
+                license: row.software_license,
+                seats: row.software_seats,
+                comment: row.software_comment,
+                ownerId: row.software_owner_id,
+                categoryId: row.software_category_id
+            };
+            const result: any = { ...software };
+
+            if (row.category_id) {
+                result.category = {
+                    id: row.category_id,
+                    name: row.category_name,
+                    platform: row.category_platform
+                } as Category;
+            }
+
+            if (row.user_id) {
+                result.owner = {
+                    id: row.user_id,
+                    name: row.user_name,
+                    email: row.user_email,
+                    role: row.user_role
+                } as User;
+            }
+
+            return result;
+        });
+
+        return { items, total };
+    },
+
+    existsByNameAndVersion: async (name: string, version: string): Promise<boolean> => {
+        const stmt = await db.prepare('SELECT 1 FROM software WHERE name = ? AND version = ? LIMIT 1');
+        const row = stmt.get(name, version) as any;
+        return !!row;
     },
 
     // Уразливий приклад пошуку, який показує ризик SQL ін'єкцій.

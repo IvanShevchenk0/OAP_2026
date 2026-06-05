@@ -15,6 +15,13 @@ export declare const softwareRepository: {
         sumSeats: any;
         avgSeats: any;
     }>;
+    getExportData: (options?: {
+        license?: string | undefined;
+    }) => Promise<{
+        items: any[];
+        total: number;
+    }>;
+    existsByNameAndVersion: (name: string, version: string) => Promise<boolean>;
     searchUnsafe: (q: string) => Promise<Software[]>;
     getById: (id: string) => Promise<Software | undefined>;
     add: (dto: CreateSoftwareDto) => Promise<Software>;

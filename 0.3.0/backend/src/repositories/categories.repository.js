@@ -9,17 +9,17 @@ const uuid_1 = require("uuid");
 const db_1 = __importDefault(require("../db"));
 exports.categoriesRepository = {
     getAll: async () => {
-        const stmt = await db_1.default.prepare('SELECT id, name FROM categories');
+        const stmt = await db_1.default.prepare('SELECT id, name, platform FROM categories');
         return stmt.all();
     },
     getById: async (id) => {
-        const stmt = await db_1.default.prepare('SELECT id, name FROM categories WHERE id = ?');
+        const stmt = await db_1.default.prepare('SELECT id, name, platform FROM categories WHERE id = ?');
         return stmt.get(id);
     },
     add: async (dto) => {
         const id = (0, uuid_1.v4)();
-        const stmt = await db_1.default.prepare('INSERT INTO categories (id, name) VALUES (?, ?)');
-        stmt.run(id, dto.name);
+        const stmt = await db_1.default.prepare('INSERT INTO categories (id, name, platform) VALUES (?, ?, ?)');
+        stmt.run(id, dto.name, dto.platform || null);
         return { id, ...dto };
     },
     update: async (id, dto) => {
@@ -27,8 +27,8 @@ exports.categoriesRepository = {
         if (!existing)
             return null;
         const updated = { ...existing, ...dto, id };
-        const stmt = await db_1.default.prepare('UPDATE categories SET name = ? WHERE id = ?');
-        stmt.run(updated.name, id);
+        const stmt = await db_1.default.prepare('UPDATE categories SET name = ?, platform = ? WHERE id = ?');
+        stmt.run(updated.name, updated.platform || null, id);
         return updated;
     },
     delete: async (id) => {

@@ -39,5 +39,10 @@ export const softwareRepository = {
 
         softwareItems.splice(index, 1);
         return true;
+    },
+
+    // Службовий метод для тестів: очистити всі записи
+    reset: (): void => {
+        softwareItems = [];
     }
 };

@@ -60,44 +60,68 @@ async function parseResponse<T>(response: Response): Promise<T> {
     throw new ApiClientError(problem);
 }
 
+const RETRY_STATUS = new Set([429, 503]);
+const MAX_RETRIES = 3;
+
+function delay(ms: number) {
+    return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
 async function request<T>(
     url: string | URL,
     options: RequestInit = {},
     timeoutMs = 12000
 ): Promise<T> {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+    const method = (options.method || 'GET').toUpperCase();
+    const safeMethod = method === 'GET' || method === 'HEAD';
+    let attempt = 0;
 
-    if (options.signal) {
-        options.signal.addEventListener('abort', () => controller.abort());
-    }
+    while (true) {
+        attempt += 1;
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
-    try {
-        const response = await fetch(url, {
-            ...options,
-            headers: { ...defaultHeaders, ...(options.headers || {}) },
-            signal: controller.signal
-        });
-        return await parseResponse<T>(response);
-    } catch (error: unknown) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-            throw new ApiClientError({
-                status: 0,
-                title: 'REQUEST_ABORTED',
-                detail: 'Запит виконано не вдалося через таймаут або скасування',
-                errors: []
-            });
+        if (options.signal) {
+            options.signal.addEventListener('abort', () => controller.abort());
         }
 
-        const message = error instanceof Error ? error.message : 'Network error';
-        throw new ApiClientError({
-            status: 0,
-            title: 'NETWORK_ERROR',
-            detail: message,
-            errors: []
-        });
-    } finally {
-        window.clearTimeout(timeoutId);
+        try {
+            const response = await fetch(url, {
+                ...options,
+                headers: { ...defaultHeaders, ...(options.headers || {}) },
+                signal: controller.signal
+            });
+
+            if (response.ok) {
+                return await parseResponse<T>(response);
+            }
+
+            if (safeMethod && attempt < MAX_RETRIES && RETRY_STATUS.has(response.status)) {
+                await delay(300 * attempt);
+                continue;
+            }
+
+            return await parseResponse<T>(response);
+        } catch (error: unknown) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                throw new ApiClientError({
+                    status: 0,
+                    title: 'REQUEST_ABORTED',
+                    detail: 'Запит виконано не вдалося через таймаут або скасування',
+                    errors: []
+                });
+            }
+
+            const message = error instanceof Error ? error.message : 'Network error';
+            throw new ApiClientError({
+                status: 0,
+                title: 'NETWORK_ERROR',
+                detail: message,
+                errors: []
+            });
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
     }
 }
 

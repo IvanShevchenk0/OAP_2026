@@ -6,10 +6,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.db = void 0;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
+const uuid_1 = require("uuid");
 const initSqlJs = require('sql.js');
 const runMigrations_1 = __importDefault(require("./migrations/runMigrations"));
 const DB_DIR = path_1.default.resolve(__dirname, '../data');
 const DB_PATH = path_1.default.join(DB_DIR, 'database.db');
+// Обгортка над sql.js для роботи з SQLite базою у файловій системі
 class DatabaseWrapper {
     db;
     readyPromise;
@@ -17,6 +19,7 @@ class DatabaseWrapper {
         this.readyPromise = this.init();
     }
     async init() {
+        // Завантажуємо sql.js та налаштовуємо шлях до WASM файлу
         const sqlJsPath = path_1.default.dirname(require.resolve('sql.js'));
         const SQL = await initSqlJs({
             locateFile: (file) => {
@@ -36,13 +39,27 @@ class DatabaseWrapper {
         }
         this.db.run('PRAGMA foreign_keys = ON;');
         await (0, runMigrations_1.default)(this);
+        await this.ensureDefaultCategories();
         this.persist();
         console.log(`SQLite ініціалізовано та міграції застосовано: ${DB_PATH}`);
+    }
+    // Перевіряємо та додаємо стандартні категорії, якщо вони відсутні
+    async ensureDefaultCategories() {
+        const defaultCategories = ['Editor', 'IDE', 'Platform'];
+        for (const name of defaultCategories) {
+            const stmt = await this.prepare('SELECT id FROM categories WHERE name = ?');
+            const row = stmt.get(name);
+            if (!row) {
+                const insert = await this.prepare('INSERT INTO categories (id, name) VALUES (?, ?)');
+                insert.run((0, uuid_1.v4)(), name);
+            }
+        }
     }
     persist() {
         const data = this.db.export();
         fs_1.default.writeFileSync(DB_PATH, Buffer.from(data));
     }
+    // Виконує SQL без повернення результатів
     async exec(sql) {
         if (!this.db) {
             await this.readyPromise;
@@ -50,6 +67,7 @@ class DatabaseWrapper {
         this.db.run(sql);
         this.persist();
     }
+    // Підготовка SQL виразу з можливістю виконання, отримання одного рядка або всіх рядків
     async prepare(sql) {
         if (!this.db) {
             await this.readyPromise;

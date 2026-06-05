@@ -22,7 +22,7 @@ const corsOptions = {
         'http://127.0.0.1:5173'
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With', 'X-Demo-UserId'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
     optionsSuccessStatus: 200
 };
 app.use((0, cors_1.default)(corsOptions));

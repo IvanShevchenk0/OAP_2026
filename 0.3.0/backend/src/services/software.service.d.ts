@@ -16,6 +16,13 @@ export declare const softwareService: {
         sumSeats: any;
         avgSeats: any;
     }>;
+    exportData: (query?: {
+        license?: string | undefined;
+    }) => Promise<{
+        items: any[];
+        total: number;
+    }>;
+    importItems: (items: unknown) => Promise<Software[]>;
     searchUnsafe: (q: string) => Promise<Software[]>;
     create: (dto: CreateSoftwareDto) => Promise<Software>;
     update: (id: string, dto: UpdateSoftwareDto) => Promise<Software>;

@@ -1,9 +1,11 @@
 import express from 'express';
 import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
 import { requestLogger } from './middleware/request-logging.middleware';
 import { errorHandler } from './middleware/error-handler.middleware';
 import softwareRoutes from './routes/software.routes'; 
 import usersRoutes from './routes/users.routes';
+import { swaggerDocument } from './swagger';
 
 const app = express();
 const PORT = 3000;
@@ -27,6 +29,12 @@ app.use('/api/software', softwareRoutes);
 
 // Підключення маршрутів для користувачів
 app.use('/api/users', usersRoutes);
+
+// Swagger UI та OpenAPI документація
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.get('/api-docs/swagger.json', (req, res) => {
+    res.json(swaggerDocument);
+});
 
 // Обробка 404 (якщо маршрут не знайдений)
 app.use((req, res, next) => {

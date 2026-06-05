@@ -96,12 +96,27 @@
 
             <section class="table-section">
                 <h2>Список ПЗ</h2>
-                <div class="filter-bar" style="margin-bottom:12px; display:flex; gap:12px; align-items:center;">
+                <div class="filter-bar" style="margin-bottom:12px; display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
                     <input id="searchInput" type="text" placeholder="Пошук за назвою..." style="padding:6px; width:200px;">
-                    <select id="licenseFilter" style="padding:6px;">
+                    <select id="licenseFilter" style="padding:6px; min-width:150px;">
                         <option value="">Всі ліцензії</option>
                         <option value="Free">Free</option>
                         <option value="Commercial">Commercial</option>
+                    </select>
+                    <select id="sortBySelect" style="padding:6px; min-width:150px;">
+                        <option value="name">Сортувати за назвою</option>
+                        <option value="version">Сортувати за версією</option>
+                        <option value="license">Сортувати за ліцензією</option>
+                        <option value="seats">Сортувати за місцями</option>
+                    </select>
+                    <select id="sortOrderSelect" style="padding:6px; min-width:120px;">
+                        <option value="asc">За зростанням</option>
+                        <option value="desc">За спаданням</option>
+                    </select>
+                    <select id="pageSizeSelect" style="padding:6px; min-width:120px;">
+                        <option value="5">5 на сторінці</option>
+                        <option value="10" selected>10 на сторінці</option>
+                        <option value="20">20 на сторінці</option>
                     </select>
                 </div>
                 <table>
@@ -119,6 +134,7 @@
                     </thead>
                     <tbody id="itemsTableBody"></tbody>
                 </table>
+                <div id="paginationControls" style="margin-top: 12px; display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:flex-start;"></div>
                 <div id="itemsStatus" style="margin-top: 12px; font-weight: bold; color: #3528a8;"></div>
                 <section class="details-section" style="margin-top: 18px;">
                     <h3>Деталі обраного ПЗ</h3>

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { softwareController } from '../controllers/software.controller';
-import { demoAuth } from '../middleware/demo-auth.middleware';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -9,9 +9,9 @@ router.get('/', softwareController.getAll);                     // Отрима�
 router.get('/summary', softwareController.summary);             // Aggregation
 router.get('/search-unsafe', softwareController.searchUnsafe);  // Небезпечний пошук (демонстрація SQLi)
 router.get('/search', softwareController.search);               // Безпечний пошук
-router.get('/:id', demoAuth, softwareController.getById);       // Отримати один за ID
-router.post('/', demoAuth, softwareController.create);          // Створити
-router.put('/:id', demoAuth, softwareController.update);        // Оновити
-router.delete('/:id', demoAuth, softwareController.delete);     // Видалити
+router.get('/:id', authMiddleware, softwareController.getById);       // Отримати один за ID
+router.post('/', authMiddleware, softwareController.create);          // Створити
+router.put('/:id', authMiddleware, softwareController.update);        // Оновити
+router.delete('/:id', authMiddleware, softwareController.delete);     // Видалити
 
 export default router;

@@ -104,16 +104,21 @@ actionBtn.addEventListener('click', async () => {
         if (!name) return alert("Введіть ваше ім'я!");
 
         try {
-            const payload = await apiClient.create<ApiItemResponse<User>>(API_URL_USERS, {
+            // Call server register endpoint. Server returns { user, token }.
+            const payload = await apiClient.create<{ user: User; token: string }>(`${location.origin}/api/auth/register`, {
                 name,
                 email,
-                role: 'user'
+                password
             });
 
-            sessionStorage.setItem('currentUserId', payload.data.id);
-            sessionStorage.setItem('currentUserEmail', email);
-            sessionStorage.setItem('currentUserName', name);
-            sessionStorage.setItem('currentUserRole', 'user');
+            // Store token and basic identity in sessionStorage for UI and future requests
+            const user = payload.data.user;
+            const token = payload.data.token;
+            sessionStorage.setItem('authToken', token);
+            sessionStorage.setItem('currentUserId', user.id);
+            sessionStorage.setItem('currentUserEmail', user.email);
+            sessionStorage.setItem('currentUserName', user.name);
+            sessionStorage.setItem('currentUserRole', user.role);
             checkAuth();
         } catch (error) {
             console.error(error);
@@ -123,22 +128,25 @@ actionBtn.addEventListener('click', async () => {
     } else {
         // Перевірка існуючого користувача (Вхід)
         try {
-            const payload = await apiClient.getList<ApiListResponse<User>>(API_URL_USERS);
-            const users = payload.data || [];
-            const existingUser = users.find(u => u.email === email);
+            // Call server login endpoint. Server returns { user, token } on success.
+            const payload = await apiClient.create<{ user: User; token: string }>(`${location.origin}/api/auth/login`, {
+                email,
+                password
+            });
 
-            if (existingUser) {
-                sessionStorage.setItem('currentUserId', existingUser.id);
-                sessionStorage.setItem('currentUserEmail', email);
-                sessionStorage.setItem('currentUserName', existingUser.name);
-                sessionStorage.setItem('currentUserRole', existingUser.role);
-                checkAuth();
-            } else {
-                alert("Користувача не знайдено! Перевірте дані або зареєструйтеся.");
-            }
+            // Save token and identity to sessionStorage
+            const user = payload.data.user;
+            const token = payload.data.token;
+            sessionStorage.setItem('authToken', token);
+            sessionStorage.setItem('currentUserId', user.id);
+            sessionStorage.setItem('currentUserEmail', user.email);
+            sessionStorage.setItem('currentUserName', user.name);
+            sessionStorage.setItem('currentUserRole', user.role);
+            checkAuth();
         } catch (error) {
             console.error(error);
-            alert("Не вдалося отримати список користувачів. Спробуйте пізніше.");
+            const msg = getErrorText(error);
+            alert(msg || "Не вдалося увійти. Перевірте облікові дані.");
         }
     }
 });
@@ -188,14 +196,22 @@ function checkAuth() {
 }
 
 // Вихід з кабінету та очищення сесії
+// Logout button: call server to revoke token then clear client state
 logoutBtn.addEventListener('click', () => {
-    sessionStorage.clear();
-    loginEmailInput.value = ''; 
-    loginPasswordInput.value = '';
-    (document.getElementById('loginEmailError') as HTMLElement).innerText = "";
-    (document.getElementById("itemsTableBody") as HTMLElement).innerHTML = "";
-    (document.getElementById("usersTableBody") as HTMLElement).innerHTML = "";
-    checkAuth(); 
+    (async () => {
+        try {
+            await apiClient.create(`${location.origin}/api/auth/logout`, {});
+        } catch (err) {
+            // ignore errors on logout
+        }
+        sessionStorage.clear();
+        loginEmailInput.value = ''; 
+        loginPasswordInput.value = '';
+        (document.getElementById('loginEmailError') as HTMLElement).innerText = "";
+        (document.getElementById("itemsTableBody") as HTMLElement).innerHTML = "";
+        (document.getElementById("usersTableBody") as HTMLElement).innerHTML = "";
+        checkAuth();
+    })();
 });
 
 

@@ -37,11 +37,32 @@ export const softwareController = {
         }
     },
 
+    // Експорт JSON-даних у форматі software + category + owner (GET /api/software/export)
+    exportData: async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const license = req.query.license as string | undefined;
+            const result = await softwareService.exportData({ license });
+            res.status(200).json({ data: result.items, meta: { total: result.total } });
+        } catch (error) {
+            next(error);
+        }
+    },
+
     // Створення нового запису (POST /api/software)
     create: async (req: Request, res: Response, next: NextFunction) => {
         try {
             const newItem = await softwareService.create(req.body);
             res.status(201).json({ data: newItem });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    // Імпорт JSON-даних з обмеженнями (POST /api/software/import)
+    importData: async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const items = await softwareService.importItems(req.body.items);
+            res.status(201).json({ data: items, meta: { imported: items.length } });
         } catch (error) {
             next(error);
         }

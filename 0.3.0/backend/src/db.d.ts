@@ -7,6 +7,7 @@ declare class DatabaseWrapper {
     private readyPromise;
     constructor();
     private init;
+    private ensureDefaultCategories;
     private persist;
     exec(sql: string): Promise<void>;
     prepare(sql: string): Promise<{

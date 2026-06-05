@@ -19,8 +19,9 @@ async function seed() {
     const u1 = await users_repository_1.usersRepository.add({ name: 'Ivan', email: 'ivan@example.com', role: 'admin' });
     const u2 = await users_repository_1.usersRepository.add({ name: 'Olena', email: 'olena@example.com', role: 'user' });
     console.log('Додаю категорії...');
-    const c1 = await categories_repository_1.categoriesRepository.add({ name: 'Editor' });
-    const c2 = await categories_repository_1.categoriesRepository.add({ name: 'IDE' });
+    const c1 = await categories_repository_1.categoriesRepository.add({ name: 'Editor', platform: 'Windows' });
+    const c2 = await categories_repository_1.categoriesRepository.add({ name: 'IDE', platform: 'Windows' });
+    const c3 = await categories_repository_1.categoriesRepository.add({ name: 'Platform', platform: 'Windows' });
     console.log('Додаю ПО...');
     await software_repository_1.softwareRepository.add({ name: 'VS Code', version: '1.86', license: 'Free', seats: 10, comment: 'Editor', ownerId: u1.id, categoryId: c1.id });
     await software_repository_1.softwareRepository.add({ name: 'IntelliJ', version: '2023.1', license: 'Commercial', seats: 5, comment: 'IDE', ownerId: u2.id, categoryId: c2.id });

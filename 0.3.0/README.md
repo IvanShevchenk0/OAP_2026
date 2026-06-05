@@ -39,6 +39,8 @@ npm run start
 - `DELETE /api/software/:id`
 - `GET /api/software/summary`
 - `GET /api/software/search?q=...`
+- `GET /api/software/export` - JSON export, optional `license` filter
+- `POST /api/software/import` - JSON import, max 10 items per request
 
 #### Categories
 - `GET /api/categories`

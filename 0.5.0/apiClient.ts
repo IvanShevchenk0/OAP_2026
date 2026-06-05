@@ -55,8 +55,14 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 function getAuthHeaders(): Record<string, string> {
-    const currentUserId = sessionStorage.getItem('currentUserId') || 'guest';
-    return { 'X-Demo-UserId': currentUserId };
+    // If the client has stored a JWT token (sessionStorage.authToken),
+    // include it as `Authorization: Bearer <token>` on every request.
+    // This keeps auth handling centralised in the client helper.
+    const token = sessionStorage.getItem('authToken');
+    if (token) {
+        return { Authorization: `Bearer ${token}` };
+    }
+    return {};
 }
 
 async function request<T>(url: string | URL, options: RequestInit = {}, timeoutMs = 12000): Promise<T> {

@@ -14,6 +14,7 @@ const categories_routes_1 = __importDefault(require("./routes/categories.routes"
 require("./db");
 const app = (0, express_1.default)();
 const PORT = 3000;
+// Express middleware та маршрути налаштовуються нижче
 // Дозволяємо запити з браузера
 app.use((0, cors_1.default)());
 // Парсинг JSON

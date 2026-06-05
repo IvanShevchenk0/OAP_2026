@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.softwareController = void 0;
 const software_service_1 = require("../services/software.service");
 exports.softwareController = {
+    // Контролер для роботи з переліком програмного забезпечення
     // Отримати весь список (GET /api/software)
     getAll: async (req, res, next) => {
         try {
@@ -40,11 +41,32 @@ exports.softwareController = {
             next(error);
         }
     },
+    // Експорт JSON-даних у форматі software + category + owner (GET /api/software/export)
+    exportData: async (req, res, next) => {
+        try {
+            const license = req.query.license;
+            const result = await software_service_1.softwareService.exportData({ license });
+            res.status(200).json({ data: result.items, meta: { total: result.total } });
+        }
+        catch (error) {
+            next(error);
+        }
+    },
     // Створення нового запису (POST /api/software)
     create: async (req, res, next) => {
         try {
             const newItem = await software_service_1.softwareService.create(req.body);
             res.status(201).json({ data: newItem });
+        }
+        catch (error) {
+            next(error);
+        }
+    },
+    // Імпорт JSON-даних з обмеженнями (POST /api/software/import)
+    importData: async (req, res, next) => {
+        try {
+            const items = await software_service_1.softwareService.importItems(req.body.items);
+            res.status(201).json({ data: items, meta: { imported: items.length } });
         }
         catch (error) {
             next(error);

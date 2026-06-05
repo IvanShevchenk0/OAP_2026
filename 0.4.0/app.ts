@@ -18,6 +18,11 @@ const state: {
     license: string;
     users: any[];
     categories: any[];
+    page: number;
+    pageSize: number;
+    sortBy: string;
+    sortOrder: 'asc' | 'desc';
+    totalItems: number;
     itemsStatus: 'idle' | 'loading' | 'loaded' | 'empty' | 'error';
     itemsError: string;
     selectedItem: Software | null;
@@ -29,12 +34,44 @@ const state: {
     license: '',
     users: [],
     categories: [],
+    page: 1,
+    pageSize: 10,
+    sortBy: 'name',
+    sortOrder: 'asc',
+    totalItems: 0,
     itemsStatus: 'idle',
     itemsError: '',
     selectedItem: null,
     selectedItemStatus: 'idle',
     selectedItemError: ''
 };
+
+const CACHE_TTL_MS = 1000 * 60 * 5; // 5 хвилин
+const itemsCache: Record<string, { data: Software[]; total: number; fetchedAt: number }> = {};
+
+function getItemsCacheKey() {
+    return `license=${state.license};page=${state.page};pageSize=${state.pageSize};sortBy=${state.sortBy};sortOrder=${state.sortOrder}`;
+}
+
+function getCachedItems() {
+    const key = getItemsCacheKey();
+    const cached = itemsCache[key];
+    if (!cached) return null;
+    if (Date.now() - cached.fetchedAt > CACHE_TTL_MS) {
+        delete itemsCache[key];
+        return null;
+    }
+    return cached;
+}
+
+function setCachedItems(items: Software[], total: number) {
+    const key = getItemsCacheKey();
+    itemsCache[key] = { data: items, total, fetchedAt: Date.now() };
+}
+
+function invalidateItemsCache() {
+    Object.keys(itemsCache).forEach(key => delete itemsCache[key]);
+}
 
 // ЛОГІКА АВТОРИЗАЦІЇ / РЕЄСТРАЦІЇ / ГОСТЯ
 const loginScreen = document.getElementById('loginScreen') as HTMLElement;
@@ -197,21 +234,40 @@ async function fetchItems() {
     state.itemsError = '';
     renderItemsStatus();
 
+    const cached = getCachedItems();
+    if (cached) {
+        state.items = cached.data;
+        state.totalItems = cached.total;
+        state.itemsStatus = state.items.length ? 'loaded' : 'empty';
+        renderItems();
+        renderItemsStatus();
+        renderPaginationControls();
+        return;
+    }
+
     try {
         const url = new URL(API_URL_SOFTWARE);
         if (state.license) url.searchParams.append('license', state.license);
+        url.searchParams.append('page', String(state.page));
+        url.searchParams.append('pageSize', String(state.pageSize));
+        url.searchParams.append('sortBy', state.sortBy);
+        url.searchParams.append('sortOrder', state.sortOrder);
 
         const payload = await apiClient.getList<ApiListResponse<Software>>(url);
         state.items = payload?.data || [];
+        state.totalItems = payload?.meta?.total || 0;
+        setCachedItems(state.items, state.totalItems);
         state.itemsStatus = state.items.length ? 'loaded' : 'empty';
     } catch (error: unknown) {
         state.items = [];
+        state.totalItems = 0;
         state.itemsStatus = 'error';
         state.itemsError = getErrorText(error);
     }
 
     renderItems();
     renderItemsStatus();
+    renderPaginationControls();
 }
 
 // Отримати список категорій (GET /api/categories)
@@ -316,6 +372,7 @@ async function addItem(formData: CreateSoftwareDto) {
     try {
         await apiClient.create<ApiItemResponse<Software>>(API_URL_SOFTWARE, formData);
         resetSoftwareForm();
+        invalidateItemsCache();
         fetchItems();
     } catch (error: unknown) {
         console.error(error);
@@ -330,6 +387,7 @@ async function saveEditItem(formData: CreateSoftwareDto) {
     try {
         await apiClient.update<ApiItemResponse<Software>>(API_URL_SOFTWARE, editId, formData);
         resetSoftwareForm();
+        invalidateItemsCache();
         fetchItems();
     } catch (error: unknown) {
         console.error(error);
@@ -342,6 +400,7 @@ async function deleteItem(id: string | null) {
     if (!id) return;
     try {
         await apiClient.remove(API_URL_SOFTWARE, id);
+        invalidateItemsCache();
         fetchItems();
     } catch (error: unknown) {
         console.error(error);
@@ -386,6 +445,40 @@ function renderItems() {
         `;
         tableBody.appendChild(row);
     });
+}
+
+function renderPaginationControls() {
+    const pagination = document.getElementById('paginationControls') as HTMLElement | null;
+    if (!pagination) return;
+
+    const totalPages = Math.max(1, Math.ceil(state.totalItems / state.pageSize));
+    const currentPage = Math.min(Math.max(1, state.page), totalPages);
+
+    pagination.innerHTML = `
+        <button id="prevPageBtn" type="button" ${currentPage <= 1 ? 'disabled' : ''} style="padding:6px 10px;">Попередня</button>
+        <span style="margin:0 10px;">Сторінка ${currentPage} з ${totalPages}</span>
+        <button id="nextPageBtn" type="button" ${currentPage >= totalPages ? 'disabled' : ''} style="padding:6px 10px;">Наступна</button>
+    `;
+
+    const prevBtn = document.getElementById('prevPageBtn') as HTMLButtonElement | null;
+    const nextBtn = document.getElementById('nextPageBtn') as HTMLButtonElement | null;
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (state.page > 1) {
+                state.page -= 1;
+                fetchItems();
+            }
+        });
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            if (state.page < totalPages) {
+                state.page += 1;
+                fetchItems();
+            }
+        });
+    }
 }
 
 // Заповнення форми даними для редагування ПЗ
@@ -560,6 +653,31 @@ form.addEventListener("submit", (event) => {
     const target = e.target as HTMLSelectElement | null;
     if (!target) return;
     state.license = target.value;
+    state.page = 1;
+    fetchItems();
+});
+(document.getElementById('sortBySelect') as HTMLSelectElement).addEventListener('change', (e) => {
+    const target = e.target as HTMLSelectElement | null;
+    if (!target) return;
+    state.sortBy = target.value;
+    state.page = 1;
+    invalidateItemsCache();
+    fetchItems();
+});
+(document.getElementById('sortOrderSelect') as HTMLSelectElement).addEventListener('change', (e) => {
+    const target = e.target as HTMLSelectElement | null;
+    if (!target) return;
+    state.sortOrder = target.value as 'asc' | 'desc';
+    state.page = 1;
+    invalidateItemsCache();
+    fetchItems();
+});
+(document.getElementById('pageSizeSelect') as HTMLSelectElement).addEventListener('change', (e) => {
+    const target = e.target as HTMLSelectElement | null;
+    if (!target) return;
+    state.pageSize = Number(target.value) || 10;
+    state.page = 1;
+    invalidateItemsCache();
     fetchItems();
 });
 

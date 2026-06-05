@@ -8,6 +8,15 @@
 
 Сервер запуститься за адресою: http://localhost:3000
 
+## Swagger / OpenAPI
+
+- Документація Swagger UI доступна за адресою: http://localhost:3000/api-docs
+- OpenAPI JSON можна отримати за адресою: http://localhost:3000/api-docs/swagger.json
+
+## Тести
+
+- Запуск unit-тестів: `npm test`
+
 ## Реалізовані сутності
 1. Software — основна доменна сутність.
    - Підтримує додаткові REST-можливості: фільтрацію (`?license=Free`) та пагінацію (`?page=1&pageSize=2`).

@@ -6,6 +6,8 @@ import { User, CreateUserDto, UpdateUserDto } from '../dtos/users.dto';
 import db from '../db';
 import { ApiError } from '../middleware/error-handler.middleware';
 
+type UserRecord = User & { password_hash?: string | null };
+
 export const usersRepository = {
     getAll: async (): Promise<User[]> => {
         const stmt = await db.prepare('SELECT id, name, email, role FROM users');
@@ -17,12 +19,17 @@ export const usersRepository = {
         return stmt.get(id) as User | undefined;
     },
 
+    getByEmail: async (email: string): Promise<UserRecord | undefined> => {
+        const stmt = await db.prepare('SELECT id, name, email, role, password_hash FROM users WHERE LOWER(email) = LOWER(?)');
+        return stmt.get(email) as UserRecord | undefined;
+    },
+
     add: async (dto: CreateUserDto): Promise<User> => {
         const id = uuidv4();
         try {
-            const stmt = await db.prepare('INSERT INTO users (id, name, email, role) VALUES (?, ?, ?, ?)');
-            stmt.run(id, dto.name, dto.email, dto.role);
-            return { id, ...dto } as User;
+            const stmt = await db.prepare('INSERT INTO users (id, name, email, role, password_hash) VALUES (?, ?, ?, ?, ?)');
+            stmt.run(id, dto.name, dto.email, dto.role, dto.passwordHash || null);
+            return { id, name: dto.name, email: dto.email, role: dto.role };
         } catch (err: any) {
             if (err && (String(err.message).includes('UNIQUE') || String(err.message).includes('constraint failed'))) {
                 throw new ApiError(409, 'CONFLICT', `Користувач з email ${dto.email} вже існує`);
@@ -36,8 +43,17 @@ export const usersRepository = {
         if (!existing) return null;
 
         const updated = { ...existing, ...dto, id } as User;
-        const stmt = await db.prepare('UPDATE users SET name = ?, email = ?, role = ? WHERE id = ?');
-        stmt.run(updated.name, updated.email, updated.role, id);
+        const columns = ['name = ?', 'email = ?', 'role = ?'];
+        const params: Array<string | null> = [updated.name, updated.email, updated.role];
+
+        if (dto.passwordHash !== undefined) {
+            columns.push('password_hash = ?');
+            params.push(dto.passwordHash);
+        }
+
+        params.push(id);
+        const stmt = await db.prepare(`UPDATE users SET ${columns.join(', ')} WHERE id = ?`);
+        stmt.run(...params);
         return updated;
     },
 
@@ -46,6 +62,7 @@ export const usersRepository = {
         const info = stmt.run(id);
         return info.changes > 0;
     },
+
     // JOIN example: отримати користувача та його ПЗ (використовує JOIN)
     getWithSoftware: async (id: string) => {
         const sql = `SELECT u.id as user_id, u.name as user_name, u.email as user_email, u.role as user_role,
