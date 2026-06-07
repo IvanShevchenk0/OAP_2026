@@ -20,15 +20,13 @@ async function runMigrations(db) {
         .sort();
     for (const file of files) {
         const full = path_1.default.join(migrationsDir, file);
-        const stmtCheck = await db.prepare('SELECT 1 FROM schema_migrations WHERE filename = ?');
-        const row = stmtCheck.get(file);
+        const row = await db.get(`SELECT 1 FROM schema_migrations WHERE filename = ${db.escape(file)}`);
         if (row)
             continue;
         const sql = fs_1.default.readFileSync(full, 'utf8');
         console.log(`Застосовую міграцію: ${file}`);
         await db.exec(sql);
-        const stmt = await db.prepare('INSERT INTO schema_migrations (filename, applied_at) VALUES (?, ?)');
-        stmt.run(file, new Date().toISOString());
+        await db.exec(`INSERT INTO schema_migrations (filename, applied_at) VALUES (${db.escape(file)}, ${db.escape(new Date().toISOString())})`);
     }
 }
 exports.default = runMigrations;

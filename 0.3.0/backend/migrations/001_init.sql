@@ -1,6 +1,6 @@
 PRAGMA foreign_keys = ON;
 
--- Users table
+-- Таблиця users
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -8,13 +8,13 @@ CREATE TABLE IF NOT EXISTS users (
   role TEXT NOT NULL
 );
 
--- Categories table
+-- Таблиця categories
 CREATE TABLE IF NOT EXISTS categories (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL UNIQUE
 );
 
--- Software table linked to users (owner) and categories
+-- Таблиця software, пов'язана з users (owner) і categories
 CREATE TABLE IF NOT EXISTS software (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS software (
   FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL
 );
 
--- Table to track applied migrations (will be created by runner too)
+-- Таблиця для відстеження застосованих міграцій (також створюється раннером)
 CREATE TABLE IF NOT EXISTS schema_migrations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   filename TEXT NOT NULL UNIQUE,

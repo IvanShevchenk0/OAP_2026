@@ -12,18 +12,15 @@ const db_1 = __importDefault(require("../db"));
 const error_handler_middleware_1 = require("../middleware/error-handler.middleware");
 exports.usersRepository = {
     getAll: async () => {
-        const stmt = await db_1.default.prepare('SELECT id, name, email, role FROM users');
-        return stmt.all();
+        return await db_1.default.all('SELECT id, name, email, role FROM users');
     },
     getById: async (id) => {
-        const stmt = await db_1.default.prepare('SELECT id, name, email, role FROM users WHERE id = ?');
-        return stmt.get(id);
+        return await db_1.default.get(`SELECT id, name, email, role FROM users WHERE id = ${db_1.default.escape(id)}`);
     },
     add: async (dto) => {
         const id = (0, uuid_1.v4)();
         try {
-            const stmt = await db_1.default.prepare('INSERT INTO users (id, name, email, role) VALUES (?, ?, ?, ?)');
-            stmt.run(id, dto.name, dto.email, dto.role);
+            await db_1.default.exec(`INSERT INTO users (id, name, email, role) VALUES (${db_1.default.escape(id)}, ${db_1.default.escape(dto.name)}, ${db_1.default.escape(dto.email)}, ${db_1.default.escape(dto.role)})`);
             return { id, ...dto };
         }
         catch (err) {
@@ -38,23 +35,20 @@ exports.usersRepository = {
         if (!existing)
             return null;
         const updated = { ...existing, ...dto, id };
-        const stmt = await db_1.default.prepare('UPDATE users SET name = ?, email = ?, role = ? WHERE id = ?');
-        stmt.run(updated.name, updated.email, updated.role, id);
+        await db_1.default.exec(`UPDATE users SET name = ${db_1.default.escape(updated.name)}, email = ${db_1.default.escape(updated.email)}, role = ${db_1.default.escape(updated.role)} WHERE id = ${db_1.default.escape(id)}`);
         return updated;
     },
     delete: async (id) => {
-        const stmt = await db_1.default.prepare('DELETE FROM users WHERE id = ?');
-        const info = stmt.run(id);
-        return info.changes > 0;
+        const result = await db_1.default.run(`DELETE FROM users WHERE id = ${db_1.default.escape(id)}`);
+        return result.changes > 0;
     },
     // JOIN example: отримати користувача та його ПЗ (використовує JOIN)
     getWithSoftware: async (id) => {
         const sql = `SELECT u.id as user_id, u.name as user_name, u.email as user_email, u.role as user_role,
           s.id as software_id, s.name as software_name, s.version as software_version, s.license as software_license,
           s.seats as software_seats, s.comment as software_comment, s.category_id as software_category_id
-        FROM users u LEFT JOIN software s ON s.owner_id = u.id WHERE u.id = ?`;
-        const stmt = await db_1.default.prepare(sql);
-        const rows = stmt.all(id);
+        FROM users u LEFT JOIN software s ON s.owner_id = u.id WHERE u.id = ${db_1.default.escape(id)}`;
+        const rows = await db_1.default.all(sql);
         if (!rows || rows.length === 0)
             return null;
         const first = rows[0];

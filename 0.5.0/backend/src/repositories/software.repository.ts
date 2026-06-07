@@ -12,11 +12,9 @@ export const softwareRepository = {
     // Репозиторій для CRUD-операцій над таблицею software
     getAll: async (options?: { license?: string; sortBy?: string; sortOrder?: 'asc' | 'desc'; limit?: number; offset?: number }) : Promise<{ items: Software[]; total: number }> => {
         const where: string[] = [];
-        const params: any[] = [];
 
         if (options?.license) {
-            where.push('license = ?');
-            params.push(options.license);
+            where.push(`license = ${db.escape(options.license)}`);
         }
 
         const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -29,46 +27,41 @@ export const softwareRepository = {
         const limitSql = (typeof options?.limit === 'number') ? `LIMIT ${options.limit}` : '';
         const offsetSql = (typeof options?.offset === 'number') ? `OFFSET ${options.offset}` : '';
 
-        const totalStmt = await db.prepare(`SELECT COUNT(*) as cnt FROM software ${whereSql}`);
-        const totalRow = totalStmt.get(...params) as any;
+        const totalSql = `SELECT COUNT(*) as cnt FROM software ${whereSql}`;
+        const totalRow = await db.get(totalSql) as any;
         const total = totalRow ? totalRow.cnt as number : 0;
 
         const sql = `SELECT id, name, version, license, seats, comment, owner_id as ownerId, category_id as categoryId FROM software ${whereSql} ${orderSql} ${limitSql} ${offsetSql}`;
-        const stmt = await db.prepare(sql);
-        const items = stmt.all(...params) as Software[];
+        const items = await db.all(sql) as Software[];
 
         return { items, total };
     },
 
     getSummary: async () => {
-        const stmt = await db.prepare('SELECT COUNT(*) as total, SUM(seats) as sumSeats, AVG(seats) as avgSeats FROM software');
-        const row = stmt.get();
+        const row = await db.get('SELECT COUNT(*) as total, SUM(seats) as sumSeats, AVG(seats) as avgSeats FROM software');
         return { total: row?.total || 0, sumSeats: row?.sumSeats || 0, avgSeats: row?.avgSeats || 0 };
     },
 
     // Небезпечний пошук: демонстрація SQL-ін'єкцій через конкатенацію рядків.
     searchUnsafe: async (q: string) => {
         const sql = `SELECT id, name, version, license, seats, comment, owner_id as ownerId, category_id as categoryId FROM software WHERE name LIKE '%${q}%' OR comment LIKE '%${q}%'`;
-        const stmt = await db.prepare(sql);
-        return stmt.all() as Software[];
+        return await db.all(sql) as Software[];
     },
 
-    // Безпечний пошук із параметризованими значеннями для захисту від SQL-ін'єкцій.
+    // Пошук без параметризованих плейсхолдерів.
     search: async (q: string) => {
         const value = `%${q}%`;
-        const stmt = await db.prepare('SELECT id, name, version, license, seats, comment, owner_id as ownerId, category_id as categoryId FROM software WHERE name LIKE ? OR comment LIKE ?');
-        return stmt.all(value, value) as Software[];
+        const sql = `SELECT id, name, version, license, seats, comment, owner_id as ownerId, category_id as categoryId FROM software WHERE name LIKE ${db.escape(value)} OR comment LIKE ${db.escape(value)}`;
+        return await db.all(sql) as Software[];
     },
 
     getById: async (id: string): Promise<Software | undefined> => {
-        const stmt = await db.prepare('SELECT id, name, version, license, seats, comment, owner_id as ownerId, category_id as categoryId FROM software WHERE id = ?');
-        return stmt.get(id) as Software | undefined;
+        return await db.get(`SELECT id, name, version, license, seats, comment, owner_id as ownerId, category_id as categoryId FROM software WHERE id = ${db.escape(id)}`) as Software | undefined;
     },
 
     add: async (dto: CreateSoftwareDto): Promise<Software> => {
         const id = uuidv4();
-        const stmt = await db.prepare('INSERT INTO software (id, name, version, license, seats, comment, owner_id, category_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-        stmt.run(id, dto.name, dto.version, dto.license, dto.seats, dto.comment || null, (dto as any).ownerId || null, (dto as any).categoryId || null);
+        await db.exec(`INSERT INTO software (id, name, version, license, seats, comment, owner_id, category_id) VALUES (${db.escape(id)}, ${db.escape(dto.name)}, ${db.escape(dto.version)}, ${db.escape(dto.license)}, ${db.escape(dto.seats)}, ${db.escape(dto.comment || null)}, ${db.escape((dto as any).ownerId || null)}, ${db.escape((dto as any).categoryId || null)})`);
         return { id, ...dto } as Software;
     },
 
@@ -77,14 +70,12 @@ export const softwareRepository = {
         if (!existing) return null;
 
         const updated = { ...existing, ...dto, id } as Software;
-        const stmt = await db.prepare('UPDATE software SET name = ?, version = ?, license = ?, seats = ?, comment = ?, owner_id = ?, category_id = ? WHERE id = ?');
-        stmt.run(updated.name, updated.version, updated.license, updated.seats, updated.comment || null, (updated as any).ownerId || null, (updated as any).categoryId || null, id);
+        await db.exec(`UPDATE software SET name = ${db.escape(updated.name)}, version = ${db.escape(updated.version)}, license = ${db.escape(updated.license)}, seats = ${db.escape(updated.seats)}, comment = ${db.escape(updated.comment || null)}, owner_id = ${db.escape((updated as any).ownerId || null)}, category_id = ${db.escape((updated as any).categoryId || null)} WHERE id = ${db.escape(id)}`);
         return updated;
     },
 
     delete: async (id: string): Promise<boolean> => {
-        const stmt = await db.prepare('DELETE FROM software WHERE id = ?');
-        const info = stmt.run(id);
-        return info.changes > 0;
+        const result = await db.run(`DELETE FROM software WHERE id = ${db.escape(id)}`);
+        return result.changes > 0;
     }
 };

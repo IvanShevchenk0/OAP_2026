@@ -5,10 +5,10 @@ export interface CreateSoftwareDto {
     license: string;
     seats: number;
     comment: string;
-    // Optional owner (user id). Підтримує зв'язок `software.owner_id -> users.id`.
+    // Необов'язковий власник (id користувача). Підтримує зв'язок `software.owner_id -> users.id`.
     // Запис може мати null, якщо власник не вказаний.
     ownerId?: string | null;
-    // Optional category (category id). Підтримує зв'язок `software.category_id -> categories.id`.
+    // Необов'язкова категорія (id категорії). Підтримує зв'язок `software.category_id -> categories.id`.
     // Запис може мати null, якщо категорія не вказана.
     categoryId?: string | null;
 }

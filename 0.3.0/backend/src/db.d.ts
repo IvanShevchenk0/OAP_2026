@@ -9,12 +9,13 @@ declare class DatabaseWrapper {
     private init;
     private ensureDefaultCategories;
     private persist;
+    private toObjectArray;
+    private toObject;
+    escape(value: any): string;
     exec(sql: string): Promise<void>;
-    prepare(sql: string): Promise<{
-        run: (...params: any[]) => RunResult;
-        get: (...params: any[]) => any;
-        all: (...params: any[]) => any[];
-    }>;
+    run(sql: string): Promise<RunResult>;
+    get(sql: string): Promise<any>;
+    all(sql: string): Promise<any[]>;
     getReady(): Promise<this>;
 }
 export declare const db: DatabaseWrapper;

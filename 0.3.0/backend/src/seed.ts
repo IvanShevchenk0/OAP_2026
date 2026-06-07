@@ -1,4 +1,4 @@
-// Seed script: наповнює БД тестовими даними
+// Скрипт seed: наповнює БД тестовими даними
 import db from './db';
 import { usersRepository } from './repositories/users.repository';
 import { categoriesRepository } from './repositories/categories.repository';

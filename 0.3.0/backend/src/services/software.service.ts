@@ -102,7 +102,7 @@ export const softwareService = {
         return created;
     },
 
-    // Unsafe search delegated to repository (demonstration only)
+    // Небезпечний пошук делеговано репозиторію (тільки демонстрація)
     searchUnsafe: async (q: string) => {
         return softwareRepository.searchUnsafe(q);
     },

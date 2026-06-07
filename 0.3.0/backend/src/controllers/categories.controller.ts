@@ -5,7 +5,7 @@ export const categoriesController = {
     getAll: async (req: Request, res: Response, next: NextFunction) => {
         try {
             const items = await categoriesService.getAll();
-            res.status(200).json(items);
+            res.status(200).json({ data: items, meta: { total: items.length } });
         } catch (err) { next(err); }
     },
 
@@ -13,14 +13,14 @@ export const categoriesController = {
         try {
             const id = req.params.id as string;
             const item = await categoriesService.getById(id);
-            res.status(200).json(item);
+            res.status(200).json({ data: item });
         } catch (err) { next(err); }
     },
 
     create: async (req: Request, res: Response, next: NextFunction) => {
         try {
             const newItem = await categoriesService.create(req.body);
-            res.status(201).json(newItem);
+            res.status(201).json({ data: newItem });
         } catch (err) { next(err); }
     },
 
@@ -28,7 +28,7 @@ export const categoriesController = {
         try {
             const id = req.params.id as string;
             const updated = await categoriesService.update(id, req.body);
-            res.status(200).json(updated);
+            res.status(200).json({ data: updated });
         } catch (err) { next(err); }
     },
 

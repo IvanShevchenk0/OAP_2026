@@ -90,7 +90,7 @@ export const softwareController = {
         }
     },
 
-    // Aggregation endpoint
+    // Ендпоінт для агрегації
     summary: async (req: Request, res: Response, next: NextFunction) => {
         try {
             const summary = await softwareService.getSummary();
@@ -100,7 +100,7 @@ export const softwareController = {
         }
     },
 
-    // Unsafe search (demonstration of SQLi)
+    // Небезпечний пошук (демонструє SQL-ін’єкцію)
     searchUnsafe: async (req: Request, res: Response, next: NextFunction) => {
         try {
             const q = (req.query.q as string) || '';

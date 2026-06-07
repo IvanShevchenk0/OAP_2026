@@ -53,11 +53,9 @@ class DatabaseWrapper {
   private async ensureDefaultCategories() {
     const defaultCategories = ['Editor', 'IDE', 'Platform'];
     for (const name of defaultCategories) {
-      const stmt = await this.prepare('SELECT id FROM categories WHERE name = ?');
-      const row = stmt.get(name);
+      const row = await this.get(`SELECT id FROM categories WHERE name = ${this.escape(name)}`);
       if (!row) {
-        const insert = await this.prepare('INSERT INTO categories (id, name) VALUES (?, ?)');
-        insert.run(uuidv4(), name);
+        await this.exec(`INSERT INTO categories (id, name) VALUES (${this.escape(uuidv4())}, ${this.escape(name)})`);
       }
     }
   }
@@ -65,6 +63,13 @@ class DatabaseWrapper {
   private persist() {
     const data = this.db.export();
     fs.writeFileSync(DB_PATH, Buffer.from(data));
+  }
+
+  escape(value: unknown) {
+    if (value === undefined || value === null) return 'NULL';
+    if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+    if (typeof value === 'boolean') return value ? '1' : '0';
+    return `'${String(value).replace(/'/g, "''")}'`;
   }
 
   // Виконує SQL без повернення результатів
@@ -76,46 +81,43 @@ class DatabaseWrapper {
     this.persist();
   }
 
-  // Підготовка SQL виразу з можливістю виконання, отримання одного рядка або всіх рядків
-  async prepare(sql: string) {
+  async run(sql: string): Promise<RunResult> {
+    if (!this.db) {
+      await this.readyPromise;
+    }
+    this.db.run(sql);
+    const result = this.db.exec('SELECT changes() AS changes;');
+    const changes = result?.[0]?.values?.[0]?.[0] ?? 0;
+    this.persist();
+    return { changes };
+  }
+
+  async get(sql: string) {
     if (!this.db) {
       await this.readyPromise;
     }
     const stmt = this.db.prepare(sql);
+    const hasRow = stmt.step();
+    if (!hasRow) {
+      stmt.free();
+      return undefined;
+    }
+    const row = stmt.getAsObject();
+    stmt.free();
+    return row;
+  }
 
-    return {
-      run: (...params: any[]): RunResult => {
-        stmt.bind(params);
-        stmt.step();
-        stmt.free();
-        const result = this.db.exec('SELECT changes() AS changes;');
-        const changes = result?.[0]?.values?.[0]?.[0] ?? 0;
-        this.persist();
-        return { changes };
-      },
-
-      get: (...params: any[]) => {
-        stmt.bind(params);
-        const hasRow = stmt.step();
-        if (!hasRow) {
-          stmt.free();
-          return undefined;
-        }
-        const row = stmt.getAsObject();
-        stmt.free();
-        return row;
-      },
-
-      all: (...params: any[]) => {
-        stmt.bind(params);
-        const rows: any[] = [];
-        while (stmt.step()) {
-          rows.push(stmt.getAsObject());
-        }
-        stmt.free();
-        return rows;
-      }
-    };
+  async all(sql: string) {
+    if (!this.db) {
+      await this.readyPromise;
+    }
+    const stmt = this.db.prepare(sql);
+    const rows: any[] = [];
+    while (stmt.step()) {
+      rows.push(stmt.getAsObject());
+    }
+    stmt.free();
+    return rows;
   }
 
   async getReady() {

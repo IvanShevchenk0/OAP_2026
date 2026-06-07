@@ -17,7 +17,7 @@ Thumbs.db
 .env
 
 # SQLite database file
-0.3.0/backend/data/database.db
+backend/data/app.db
 
 # Temporary files
 *.tmp

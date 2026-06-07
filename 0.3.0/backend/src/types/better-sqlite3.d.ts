@@ -1,5 +1,5 @@
 declare module 'better-sqlite3' {
-  // Minimal type declarations used in this project.
+  // Мінімальні декларації типів, які використовуються в цьому проєкті.
   export interface RunResult {
     changes: number;
     lastInsertROWID?: number;

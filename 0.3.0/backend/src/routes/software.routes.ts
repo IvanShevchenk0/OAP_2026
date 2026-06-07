@@ -6,8 +6,8 @@ const router = Router();
 // CRUD та JSON експорт/імпорт
 router.get('/export', softwareController.exportData);      // Експорт JSON
 router.post('/import', softwareController.importData);     // Імпорт JSON
-router.get('/summary', softwareController.summary);    // Aggregation
-router.get('/search', softwareController.searchUnsafe); // Unsafe search (SQLi demo)
+router.get('/summary', softwareController.summary);    // Агрегація
+router.get('/search', softwareController.searchUnsafe); // Небезпечний пошук (демонстрація SQLi)
 router.get('/', softwareController.getAll);            // Отримати список
 router.get('/:id', softwareController.getById);        // Отримати один за ID
 router.post('/', softwareController.create);           // Створити

@@ -5,7 +5,7 @@ const initSqlJs: any = require('sql.js');
 import runMigrations from './migrations/runMigrations';
 
 const DB_DIR = path.resolve(__dirname, '../data');
-const DB_PATH = path.join(DB_DIR, 'database.db');
+const DB_PATH = path.join(DB_DIR, 'app.db');
 
 interface RunResult {
   changes: number;
@@ -53,11 +53,9 @@ class DatabaseWrapper {
   private async ensureDefaultCategories() {
     const defaultCategories = ['Editor', 'IDE', 'Platform'];
     for (const name of defaultCategories) {
-      const stmt = await this.prepare('SELECT id FROM categories WHERE name = ?');
-      const row = stmt.get(name);
+      const row = await this.get(`SELECT id FROM categories WHERE name = ${this.escape(name)}`);
       if (!row) {
-        const insert = await this.prepare('INSERT INTO categories (id, name) VALUES (?, ?)');
-        insert.run(uuidv4(), name);
+        await this.run(`INSERT INTO categories (id, name) VALUES (${this.escape(uuidv4())}, ${this.escape(name)})`);
       }
     }
   }
@@ -67,7 +65,44 @@ class DatabaseWrapper {
     fs.writeFileSync(DB_PATH, Buffer.from(data));
   }
 
-  // Виконує SQL без повернення результатів
+  private toObjectArray(result: any[]): any[] {
+    if (!result || result.length === 0) {
+      return [];
+    }
+    const row = result[0];
+    const columns: string[] = row.columns || [];
+    return row.values.map((values: any[]) => {
+      const record: any = {};
+      columns.forEach((column, index) => {
+        record[column] = values[index];
+      });
+      return record;
+    });
+  }
+
+  private toObject(result: any[]): any | undefined {
+    const rows = this.toObjectArray(result);
+    return rows.length > 0 ? rows[0] : undefined;
+  }
+
+  escape(value: any): string {
+    if (value === null || value === undefined) {
+      return 'NULL';
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
+
+    if (typeof value === 'boolean') {
+      return value ? '1' : '0';
+    }
+
+    const escaped = String(value).replace(/'/g, "''");
+    return `'${escaped}'`;
+  }
+
+  // Виконує SQL без параметрів
   async exec(sql: string) {
     if (!this.db) {
       await this.readyPromise;
@@ -76,46 +111,28 @@ class DatabaseWrapper {
     this.persist();
   }
 
-  // Підготовка SQL виразу з можливістю виконання, отримання одного рядка або всіх рядків
-  async prepare(sql: string) {
+  async run(sql: string): Promise<RunResult> {
     if (!this.db) {
       await this.readyPromise;
     }
-    const stmt = this.db.prepare(sql);
+    this.db.run(sql);
+    const info = this.toObject(this.db.exec('SELECT changes() AS changes, last_insert_rowid() AS lastInsertROWID;')) as RunResult | undefined;
+    this.persist();
+    return info ?? { changes: 0 };
+  }
 
-    return {
-      run: (...params: any[]): RunResult => {
-        stmt.bind(params);
-        stmt.step();
-        stmt.free();
-        const result = this.db.exec('SELECT changes() AS changes;');
-        const changes = result?.[0]?.values?.[0]?.[0] ?? 0;
-        this.persist();
-        return { changes };
-      },
+  async get(sql: string) {
+    if (!this.db) {
+      await this.readyPromise;
+    }
+    return this.toObject(this.db.exec(sql));
+  }
 
-      get: (...params: any[]) => {
-        stmt.bind(params);
-        const hasRow = stmt.step();
-        if (!hasRow) {
-          stmt.free();
-          return undefined;
-        }
-        const row = stmt.getAsObject();
-        stmt.free();
-        return row;
-      },
-
-      all: (...params: any[]) => {
-        stmt.bind(params);
-        const rows: any[] = [];
-        while (stmt.step()) {
-          rows.push(stmt.getAsObject());
-        }
-        stmt.free();
-        return rows;
-      }
-    };
+  async all(sql: string) {
+    if (!this.db) {
+      await this.readyPromise;
+    }
+    return this.toObjectArray(this.db.exec(sql));
   }
 
   async getReady() {

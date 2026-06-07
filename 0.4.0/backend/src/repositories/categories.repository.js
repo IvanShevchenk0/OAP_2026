@@ -9,17 +9,14 @@ const uuid_1 = require("uuid");
 const db_1 = __importDefault(require("../db"));
 exports.categoriesRepository = {
     getAll: async () => {
-        const stmt = await db_1.default.prepare('SELECT id, name, platform FROM categories');
-        return stmt.all();
+        return await db_1.default.all('SELECT id, name, platform FROM categories');
     },
     getById: async (id) => {
-        const stmt = await db_1.default.prepare('SELECT id, name, platform FROM categories WHERE id = ?');
-        return stmt.get(id);
+        return await db_1.default.get(`SELECT id, name, platform FROM categories WHERE id = ${db_1.default.escape(id)}`);
     },
     add: async (dto) => {
         const id = (0, uuid_1.v4)();
-        const stmt = await db_1.default.prepare('INSERT INTO categories (id, name, platform) VALUES (?, ?, ?)');
-        stmt.run(id, dto.name, dto.platform || null);
+        await db_1.default.exec(`INSERT INTO categories (id, name, platform) VALUES (${db_1.default.escape(id)}, ${db_1.default.escape(dto.name)}, ${db_1.default.escape(dto.platform || null)})`);
         return { id, ...dto };
     },
     update: async (id, dto) => {
@@ -27,14 +24,12 @@ exports.categoriesRepository = {
         if (!existing)
             return null;
         const updated = { ...existing, ...dto, id };
-        const stmt = await db_1.default.prepare('UPDATE categories SET name = ?, platform = ? WHERE id = ?');
-        stmt.run(updated.name, updated.platform || null, id);
+        await db_1.default.exec(`UPDATE categories SET name = ${db_1.default.escape(updated.name)}, platform = ${db_1.default.escape(updated.platform || null)} WHERE id = ${db_1.default.escape(id)}`);
         return updated;
     },
     delete: async (id) => {
-        const stmt = await db_1.default.prepare('DELETE FROM categories WHERE id = ?');
-        const info = stmt.run(id);
-        return info.changes > 0;
+        const result = await db_1.default.run(`DELETE FROM categories WHERE id = ${db_1.default.escape(id)}`);
+        return result.changes > 0;
     }
 };
 //# sourceMappingURL=categories.repository.js.map

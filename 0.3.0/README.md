@@ -27,8 +27,9 @@ npm run start
 Сервер доступний за адресою `http://localhost:3000`.
 
 ## Важливе
-- На старті сервер автоматично створює базу даних `0.3.0/backend/data/database.db`.
+- На старті сервер автоматично створює базу даних `0.3.0/backend/data/app.db`.
 - Дефолтні категорії `Editor`, `IDE`, `Platform` додаються автоматично, якщо їх ще нема.
+- Файл бази `backend/data/app.db` додано до `.gitignore`.
 
 ## API
 #### Software
@@ -38,7 +39,7 @@ npm run start
 - `PUT /api/software/:id`
 - `DELETE /api/software/:id`
 - `GET /api/software/summary`
-- `GET /api/software/search?q=...`
+- `GET /api/software/search?q=...` - unsafe SQL search demo, показує ризик SQL-ін’єкцій при конкатенації запитів
 - `GET /api/software/export` - JSON export, optional `license` filter
 - `POST /api/software/import` - JSON import, max 10 items per request
 
@@ -62,6 +63,11 @@ npm run start
 - `categories`: `id PK`, `name NOT NULL UNIQUE`, `platform`
 - `software`: `id PK`, `name NOT NULL`, `version NOT NULL`, `license NOT NULL`, `seats INTEGER NOT NULL`, `comment`, `owner_id FK`, `category_id FK`
 - `schema_migrations`: лог виконаних міграцій
+
+## Пошук і SQL-ін’єкція
+- Запит `GET /api/software/search?q=...` демонструє небезпечну конкатенацію SQL.
+- Наприклад: `q=' OR 1=1 --` може змінити логіку запиту, якщо не застосувати правильне екранування.
+- У цьому проєкті використовується `db.escape(...)` у репозиторіях для утворення безпечних SQL-рядків, але цей endpoint показує, чому параметризовані запити є важливими.
 
 ## Зауваження
 - Категорія у ПЗ передається через поле `categoryId`.
