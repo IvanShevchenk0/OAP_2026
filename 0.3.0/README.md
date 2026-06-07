@@ -1,136 +1,169 @@
-# Проєкт 0.3.0 — Backend (SQLite)
+# Backend SQLite API (0.3.0)
 
-Коротко
----
-Цей бекенд — невеликий REST API на Node.js + TypeScript з локальною SQLite базою (`sql.js`). Схема застосовується через SQL-міграції при старті сервера. Файл бази зберігається локально у `data/app.db`.
+## Опис
+Цей бекенд використовує SQLite для збереження даних у локальному файлі `backend/data/app.db`.
+Міграції виконуються автоматично при старті сервера. Додатково є сценарій seed для наповнення тестовими записами.
 
-Швидкий старт
----
-1. Відкрийте папку `0.3.0/backend`
-2. Встановіть залежності:
-```bash
-npm install
-```
-3. Запустіть у режимі розробки:
-```bash
-npm run dev
-```
-Сервер слухає `http://localhost:3000`.
+## Запуск
+1. Відкрити папку `0.3.0/backend`
+2. Встановити залежності:
+	 ```bash
+	 npm install
+	 ```
+3. Запустити сервер у режимі розробки:
+	 ```bash
+	 npm run dev
+	 ```
+	 Сервер слухає на порту `3000` за адресою `http://localhost:3000`.
 
-Щоб збудувати і запустити production:
-```bash
-npm run build
-npm start
-```
+4. Або зібрати та запустити у production:
+	 ```bash
+	 npm run build
+	 npm start
+	 ```
 
-Де знаходиться база
----
-- Файл БД: `0.3.0/backend/data/app.db`
-- Не додавайте `.db` у git — ігноруйте директорію/файл у `.gitignore` (наприклад `0.3.0/backend/data/` або `*.db`).
+## Ініціалізація бази даних
+- Файл бази даних створюється автоматично при першому старті сервера.
+- Шлях файлу: `0.3.0/backend/data/app.db`.
+- Файл не зберігається в репозиторії завдяки `.gitignore`.
 
-Ініціалізація та міграції
----
-- Міграції: `0.3.0/backend/migrations/*.sql` (застосовуються автоматично при старті).
-- Перед запуском HTTP-сервера схему ініціалізують (CREATE TABLE IF NOT EXISTS / runMigrations), щоб уникнути помилок при перших запитах.
-- Потрібно включити `PRAGMA foreign_keys = ON;` для примушування зовнішніх ключів.
-
-Seed (тестові дані)
----
-Щоб наповнити БД прикладами:
+## Seed даних
+Щоб наповнити БД тестовими записами, запустіть:
 ```bash
 npm run seed
 ```
 
-Формат відповідей
----
-- Списки: `{ "data": [...], "meta": { "total": N } }`
-- Одиничні: `{ "data": {...} }`
-- Помилки: `{ "error": { "code": "...", "message": "...", "details": [...] } }` (re-throw `ApiError` у сервісі → централізований middleware повертає JSON)
+## Схема БД
+### Таблиці
+- `users`
+	- `id` TEXT PRIMARY KEY
+	- `name` TEXT NOT NULL
+	- `email` TEXT NOT NULL UNIQUE
+	- `role` TEXT NOT NULL CHECK(role IN ('admin', 'user'))
 
-DTO і структура коду
----
-- DTO: `src/dtos/*.ts` (`users.dto.ts`, `software.dto.ts`, `category.dto.ts`)
-- Архітектура: routes → controllers → services → repositories
+- `categories`
+	- `id` TEXT PRIMARY KEY
+	- `name` TEXT NOT NULL UNIQUE
+	- `platform` TEXT
 
-Основні ендпоінти
----
-- Users: `GET /api/users`, `GET /api/users/:id`, `GET /api/users/:id/with-software`, `POST /api/users`, `PUT /api/users/:id`, `DELETE /api/users/:id`
-- Categories: `GET /api/categories`, `GET /api/categories/:id`, `POST /api/categories`, `PUT /api/categories/:id`, `DELETE /api/categories/:id`
-- Software: `GET /api/software`, `GET /api/software/:id`, `POST /api/software`, `PUT /api/software/:id`, `DELETE /api/software/:id`
-- Додатково: `GET /api/software/export`, `POST /api/software/import`, `GET /api/software/summary`, `GET /api/software/search?q=...` (демонстрація SQLi)
+- `software`
+	- `id` TEXT PRIMARY KEY
+	- `name` TEXT NOT NULL
+	- `version` TEXT NOT NULL
+	- `license` TEXT NOT NULL
+	- `seats` INTEGER NOT NULL CHECK(seats > 0)
+	- `comment` TEXT
+	- `owner_id` TEXT
+	- `category_id` TEXT
+	- FOREIGN KEY(`owner_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+	- FOREIGN KEY(`category_id`) REFERENCES `categories`(`id`) ON DELETE SET NULL
 
-JOIN та агрегації
----
-- JOIN приклад: `GET /api/users/:id/with-software` повертає користувача та пов'язане ПО (реалізація в `users.repository.getWithSoftware`).
-- Агрегація: `GET /api/software/summary` повертає `{ total, sumSeats, avgSeats }` (реалізація в `software.repository.getSummary`).
+### Зв'язки
+- `users` 1:N `software` через `software.owner_id`
+- `categories` 1:N `software` через `software.category_id`
 
-Приклади `curl`
----
-1) Фільтрація + сортування + пагінація (WHERE + ORDER BY + LIMIT):
+### Обмеження цілісності
+- `NOT NULL` там, де поля обов'язкові.
+- `UNIQUE` на `users.email` і `categories.name`.
+- `CHECK(role IN ('admin', 'user'))` на таблиці `users`.
+- `CHECK(seats > 0)` на таблиці `software`.
+
+## Міграції
+Міграції знаходяться у папці `backend/migrations/`:
+- `001_init.sql` — створення базових таблиць
+- `002_indexes.sql` — індекси
+- `003_categories_platform.sql` — додавання поля `platform`
+- `004_add_constraints.sql` — додавання CHECK-обмежень
+
+Сервер застосовує тільки ті міграції, яких ще нема в таблиці `schema_migrations`.
+
+## Ендпоінти
+- `GET /api/users`
+- `GET /api/users/:id`
+- `GET /api/users/:id/with-software`
+- `POST /api/users`
+- `PUT /api/users/:id`
+- `DELETE /api/users/:id`
+
+- `GET /api/categories`
+- `GET /api/categories/:id`
+- `POST /api/categories`
+- `PUT /api/categories/:id`
+- `DELETE /api/categories/:id`
+
+- `GET /api/software`
+- `GET /api/software/:id`
+- `POST /api/software`
+- `PUT /api/software/:id`
+- `DELETE /api/software/:id`
+- `GET /api/software/export`
+- `POST /api/software/import`
+- `GET /api/software/summary`
+- `GET /api/software/search?q=...`
+
+## Приклади запитів
+### 1) Сортування, фільтрація, пагінація (WHERE + ORDER BY + LIMIT)
 ```bash
 curl "http://localhost:3000/api/software?license=Free&sortBy=name&sortOrder=desc&page=1&pageSize=5"
 ```
+Цей запит виконує фільтрацію `WHERE license = 'Free'`, сортування `ORDER BY name DESC` та пагінацію через `LIMIT`/`OFFSET`.
 
-2) Отримати користувача з його ПЗ (JOIN):
+### 2) Отримати користувача з його ПЗ
 ```bash
 curl "http://localhost:3000/api/users/<userId>/with-software"
 ```
 
-3) Створити категорію (можливий 409 при дублі):
+### 3) Створити користувача
+```bash
+curl -X POST http://localhost:3000/api/users \
+	-H 'Content-Type: application/json' \
+	-d '{"name":"Ivan","email":"ivan@example.com","role":"admin"}'
+```
+
+### 4) Створити категорію
 ```bash
 curl -X POST http://localhost:3000/api/categories \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Office","platform":"Windows"}'
+	-H 'Content-Type: application/json' \
+	-d '{"name":"Office","platform":"Windows"}'
 ```
 
-4) Приклад 409 Conflict (дубль назви категорії):
+### Conflict example (409) — дублювання назви категорії
+Якщо створити категорію з тією самою назвою вдруге, сервер поверне `409 Conflict`.
+```bash
+curl -X POST http://localhost:3000/api/categories \
+	-H 'Content-Type: application/json' \
+	-d '{"name":"Office","platform":"Windows"}'
+```
+Приклад очікуваної відповіді:
 ```json
 {
-  "error": { "code": "CONFLICT", "message": "Категорія з назвою Office вже існує" }
+	"error": {
+		"code": "CONFLICT",
+		"message": "Категорія з назвою Office вже існує"
+	}
 }
 ```
-
-5) Імпорт JSON (макс. 10 елементів):
+### 5) Створити програмне забезпечення
 ```bash
-curl -X POST http://localhost:3000/api/software/import \
-  -H 'Content-Type: application/json' \
-  -d '{"items": [{"name":"MyApp","version":"1.0","license":"Commercial","seats":10}] }'
+curl -X POST http://localhost:3000/api/software \
+	-H 'Content-Type: application/json' \
+	-d '{"name":"MyApp","version":"1.0.0","license":"Commercial","seats":10,"comment":"Тестове ПЗ","ownerId":"<userId>","categoryId":"<categoryId>"}'
 ```
 
-SQL‑injection (демонстрація)
----
-- Небезпечний endpoint: `GET /api/software/search?q=...` формує SQL через конкатенацію у `software.repository.searchUnsafe`.
-- Чому це небезпечно: зловмисний ввід може змінити логіку WHERE, наприклад `q=' OR '1'='1` може повернути всі записи.
-- Використовуйте параметризовані запити або `db.escape(...)` для уникнення ін'єкцій.
+> Для Postman: виберіть потрібний метод, вставте URL, у вкладці Body оберіть `raw` + `JSON`, і використайте ті самі JSON, що наведені вище.
 
-Чому `.db` не в git
----
-- Файли БД — бінарні, часто змінюються, можуть містити приватні/тестові дані і викликають конфлікти при мерджах. Зберігайте міграції (`migrations/*.sql`) та seed-скрипти у репо, а сам файл ігноруйте.
+## SQL-injection (демонстрація)
+Є ендпоінт `GET /api/software/search?q=...`, який показово формує SQL через рядкову конкатенацію.
+Це небезпечно, бо введення може змінити умову запиту.
 
-Корисні команди
----
-```bash
-# видалити локальну БД, щоб застосувались міграції заново
-rm 0.3.0/backend/data/app.db
-
-# запустити seed
-cd 0.3.0/backend && npm run seed
-
-# запустити сервер (dev)
-cd 0.3.0/backend && npm run dev
+Наприклад, якщо `q` встановити в:
+```text
+' OR '1'='1
 ```
+це може повернути всі записи.
 
-Де шукати код
----
-- Ініціалізація БД: `src/db.ts`
-- Міграції: `src/migrations/runMigrations.ts` + `backend/migrations/*.sql`
-- Репозиторії: `src/repositories/*` (CRUD + SQL)
-- Сервіси: `src/services/*` (валідація, бізнес-логіка)
-- Контролери/маршрути: `src/controllers/*`, `src/routes/*`
-
-Якщо потрібно — можу:
-- додати розгорнуті приклади Postman
-- додати unit/integration test для імпорту/409/404 сценаріїв
-
----
+## Додаткові зауваження
+- Файл SQLite зберігається локально, але не комітиться у репозиторій.
+- Централізована обробка помилок повертає JSON з `code`, `message`, `details`.
+- Логуються ключові події ініціалізації та застосування міграцій.
 
