@@ -58,6 +58,16 @@
 
 Серверна частина доступна за адресою `http://localhost:3000`.
 
+### Файл SQLite
+- Локальний файл бази даних: `0.4.0/backend/data/database.db`
+- Він має бути ігнорований у Git і не зберігається у репозиторії.
+
+### Seed даних
+- Щоб наповнити БД тестовими записами, перейдіть у `0.4.0/backend` та запустіть:
+```bash
+npm run seed
+```
+
 ## Специфікація API
 
 ### Ендпоінти версії 1 (v1)
@@ -103,6 +113,22 @@ curl -X PUT http://localhost:3000/api/v1/software/1 \
 curl -X DELETE http://localhost:3000/api/v1/software/1
 ```
 
+### Фільтрація + сортування + пагінація
+```bash
+curl "http://localhost:3000/api/v1/software?license=MIT&sortBy=name&sortOrder=desc&page=1&pageSize=5"
+```
+Цей запит демонструє `WHERE license = 'MIT'`, `ORDER BY name DESC` і `LIMIT/OFFSET`.
+
+### SQL-injection (демонстраційний endpoint)
+Є маршрут `GET /api/software/search?q=...`, який реалізовано через небезпечну конкатенацію рядка SQL.
+Це зроблено спеціально для навчальної демонстрації неправильної реалізації, яку не потрібно виправляти у цій роботі.
+
+Приклад «поганого» вводу:
+```text
+' OR '1'='1
+```
+У такому випадку запит може повернути всі записи замість очікуваного пошуку.
+
 ### Обробка помилок (формат ProblemDetails)
 При виникненні помилки сервер повертає відповідь у наступному форматі:
 ```json
@@ -115,6 +141,40 @@ curl -X DELETE http://localhost:3000/api/v1/software/1
   ]
 }
 ```
+
+## Схема БД
+
+### Таблиці
+- `users`
+  - `id` TEXT PRIMARY KEY
+  - `name` TEXT NOT NULL
+  - `email` TEXT NOT NULL UNIQUE
+  - `role` TEXT NOT NULL
+- `categories`
+  - `id` TEXT PRIMARY KEY
+  - `name` TEXT NOT NULL UNIQUE
+  - `platform` TEXT
+- `software`
+  - `id` TEXT PRIMARY KEY
+  - `name` TEXT NOT NULL
+  - `version` TEXT NOT NULL
+  - `license` TEXT NOT NULL
+  - `seats` INTEGER NOT NULL
+  - `comment` TEXT
+  - `owner_id` TEXT
+  - `category_id` TEXT
+  - FOREIGN KEY(`owner_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+  - FOREIGN KEY(`category_id`) REFERENCES `categories`(`id`) ON DELETE SET NULL
+
+### Зв'язки
+- `users` 1:N `software` через `owner_id`
+- `categories` 1:N `software` через `category_id`
+
+### Обмеження
+- `NOT NULL` там, де поля обов'язкові.
+- `UNIQUE` на `users.email` і `categories.name`.
+- `FOREIGN KEY` для referential integrity.
+- `PRAGMA foreign_keys = ON` виконується при ініціалізації БД.
 
 ## Основні характеристики реалізації
 
