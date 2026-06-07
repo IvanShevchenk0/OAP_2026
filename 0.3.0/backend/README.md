@@ -127,6 +127,22 @@ curl -X POST http://localhost:3000/api/categories \
   -d '{"name":"Office","platform":"Windows"}'
 ```
 
+### Conflict example (409) — дублювання назви категорії
+Якщо створити категорію з тією самою назвою вдруге, сервер поверне `409 Conflict`.
+```bash
+curl -X POST http://localhost:3000/api/categories \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Office","platform":"Windows"}'
+```
+Приклад очікуваної відповіді:
+```json
+{
+  "error": {
+    "code": "CONFLICT",
+    "message": "Категорія з назвою Office вже існує"
+  }
+}
+```
 ### 5) Створити програмне забезпечення
 ```bash
 curl -X POST http://localhost:3000/api/software \
@@ -134,7 +150,7 @@ curl -X POST http://localhost:3000/api/software \
   -d '{"name":"MyApp","version":"1.0.0","license":"Commercial","seats":10,"comment":"Тестове ПЗ","ownerId":"<userId>","categoryId":"<categoryId>"}'
 ```
 
-> Для Postman: виберіть потрібний метод, вставте URL, у вкладці Body оберіть `raw` + `JSON`, і використайте ті самі JSON-тела, що наведені вище.
+> Для Postman: виберіть потрібний метод, вставте URL, у вкладці Body оберіть `raw` + `JSON`, і використайте ті самі JSON, що наведені вище.
 
 ## SQL-injection (демонстрація)
 Є ендпоінт `GET /api/software/search?q=...`, який показово формує SQL через рядкову конкатенацію.

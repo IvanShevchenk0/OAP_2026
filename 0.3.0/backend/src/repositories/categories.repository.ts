@@ -2,6 +2,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Category, CreateCategoryDto, UpdateCategoryDto } from '../dtos/category.dto';
 import db from '../db';
+import { ApiError } from '../middleware/error-handler.middleware';
 
 export const categoriesRepository = {
     getAll: async (): Promise<Category[]> => {
@@ -14,8 +15,15 @@ export const categoriesRepository = {
 
     add: async (dto: CreateCategoryDto): Promise<Category> => {
         const id = uuidv4();
-        await db.run(`INSERT INTO categories (id, name, platform) VALUES (${db.escape(id)}, ${db.escape(dto.name)}, ${db.escape(dto.platform || null)})`);
-        return { id, ...dto } as Category;
+        try {
+            await db.run(`INSERT INTO categories (id, name, platform) VALUES (${db.escape(id)}, ${db.escape(dto.name)}, ${db.escape(dto.platform || null)})`);
+            return { id, ...dto } as Category;
+        } catch (err: any) {
+            if (err && (String(err.message).includes('UNIQUE') || String(err.message).includes('constraint failed'))) {
+                throw new ApiError(409, 'CONFLICT', `Категорія з назвою ${dto.name} вже існує`);
+            }
+            throw err;
+        }
     },
 
     update: async (id: string, dto: UpdateCategoryDto): Promise<Category | null> => {
