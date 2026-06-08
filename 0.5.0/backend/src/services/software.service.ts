@@ -1,8 +1,22 @@
 import { softwareRepository } from '../repositories/software.repository';
-import { CreateSoftwareDto, UpdateSoftwareDto, Software } from '../../../shared/dtos';
+import { CreateSoftwareDto, UpdateSoftwareDto, Software } from '../shared/dtos';
 import { ApiError } from '../middleware/error-handler.middleware';
 
-type DemoUser = { id: string; role: 'admin' | 'user' | 'guest' } | undefined;
+// Перевірка доступу: користувач може читати/змінювати ресурс, тільки якщо він адмін або власник
+export async function ensureSoftwareAccess(itemId: string, user: any): Promise<Software> {
+    const item = await softwareRepository.getById(itemId);
+    if (!item) {
+        throw new ApiError(404, "NOT_FOUND", `ПЗ з id ${itemId} не знайдено`);
+    }
+
+    // Дозволяємо адміністратору та власнику
+    if (user.role === 'admin' || (user.id === item.ownerId)) {
+        return item;
+    }
+
+    // Всім іншим - 403 FORBIDDEN
+    throw new ApiError(403, "FORBIDDEN", "Вам не дозволено редагувати цей ресурс");
+}
 
 export const softwareService = {
     // Логіка бізнес-рівня для роботи з ПЗ.
@@ -26,70 +40,50 @@ export const softwareService = {
         return softwareRepository.getAll(options);
     },
 
-    getById: async (id: string, user?: DemoUser): Promise<Software> => {
+    getById: async (id: string): Promise<Software> => {
         const item = await softwareRepository.getById(id);
-        ensureSoftwareAccess(item, user, id);
-        return item as Software;
+        if (!item) {
+            throw new ApiError(404, "NOT_FOUND", `ПЗ з id ${id} не знайдено`);
+        }
+        return item;
     },
 
     getSummary: async () => {
         return softwareRepository.getSummary();
     },
 
-    searchUnsafe: async (q: string) => {
-        return softwareRepository.searchUnsafe(q);
-    },
-
+    // Безпечний пошук через параметризований запит
     search: async (q: string) => {
         return softwareRepository.search(q);
     },
 
-    create: async (dto: CreateSoftwareDto, user?: DemoUser): Promise<Software> => {
-        if (!user || user.role === 'guest') {
-            throw new ApiError(401, 'UNAUTHORIZED', 'Для створення запису необхідно увійти');
-        }
-
-        validateSoftwareDto(dto, false);
-        const payload = { ...dto, ownerId: user.id } as CreateSoftwareDto;
-        return softwareRepository.add(payload);
+    // Небезпечний пошук через репозиторій (демонстрація SQL-ін'єкцій)
+    searchUnsafe: async (q: string) => {
+        return softwareRepository.searchUnsafe(q);
     },
 
-    update: async (id: string, dto: UpdateSoftwareDto, user?: DemoUser): Promise<Software> => {
-        const existing = await softwareRepository.getById(id);
-        ensureSoftwareAccess(existing, user, id);
+    create: async (dto: CreateSoftwareDto): Promise<Software> => {
+        validateSoftwareDto(dto, false);
+        return softwareRepository.add(dto);
+    },
 
+    update: async (id: string, dto: UpdateSoftwareDto): Promise<Software> => {
+        await softwareService.getById(id); // Перевірка чи існує
         validateSoftwareDto(dto, true);
-        const updatedItem = await softwareRepository.update(id, { ...existing, ...dto });
+        const updatedItem = await softwareRepository.update(id, dto);
         if (!updatedItem) {
             throw new ApiError(500, "INTERNAL_ERROR", "Не вдалося оновити запис");
         }
         return updatedItem;
     },
 
-    delete: async (id: string, user?: DemoUser): Promise<void> => {
-        const existing = await softwareRepository.getById(id);
-        ensureSoftwareAccess(existing, user, id);
-
+    delete: async (id: string): Promise<void> => {
         const isDeleted = await softwareRepository.delete(id);
         if (!isDeleted) {
             throw new ApiError(404, "NOT_FOUND", `ПЗ з id ${id} не знайдено для видалення`);
         }
     }
 };
-
-function ensureSoftwareAccess(item: Software | undefined, user: DemoUser | undefined, id: string) {
-    if (!item) {
-        throw new ApiError(404, 'NOT_FOUND', `ПЗ з id ${id} не знайдено`);
-    }
-
-    if (!user) {
-        throw new ApiError(401, 'UNAUTHORIZED', 'Необхідно надати контекст користувача');
-    }
-
-    if (user.role !== 'admin' && user.id !== item.ownerId) {
-        throw new ApiError(403, 'FORBIDDEN', `Доступ до ПЗ з id ${id} заборонено`);
-    }
-}
 
 // Перевірка DTO перед збереженням у базу
 function validateSoftwareDto(dto: CreateSoftwareDto | UpdateSoftwareDto, partial: boolean) {

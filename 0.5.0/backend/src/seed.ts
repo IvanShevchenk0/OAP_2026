@@ -3,7 +3,6 @@ import db from './db';
 import { usersRepository } from './repositories/users.repository';
 import { categoriesRepository } from './repositories/categories.repository';
 import { softwareRepository } from './repositories/software.repository';
-import { hashPassword } from './services/auth.service';
 
 async function seed() {
   console.log('Запуск seed: очищаю таблиці...');
@@ -14,8 +13,8 @@ async function seed() {
   await db.exec('PRAGMA foreign_keys = ON;');
 
   console.log('Додаю користувачів...');
-  const u1 = await usersRepository.add({ name: 'Ivan', email: 'ivan@example.com', role: 'admin', passwordHash: hashPassword('admin123') });
-  const u2 = await usersRepository.add({ name: 'Olena', email: 'olena@example.com', role: 'user', passwordHash: hashPassword('user123') });
+  const u1 = await usersRepository.add({ name: 'Ivan', email: 'ivan@example.com', role: 'admin' });
+  const u2 = await usersRepository.add({ name: 'Olena', email: 'olena@example.com', role: 'user' });
 
   console.log('Додаю категорії...');
   const c1 = await categoriesRepository.add({ name: 'Editor', platform: 'Windows' });

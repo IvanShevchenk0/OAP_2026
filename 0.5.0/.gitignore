@@ -16,8 +16,15 @@ Thumbs.db
 # Environment variables
 .env
 
-# SQLite database file
+# SQLite database files
 0.3.0/backend/data/database.db
+0.4.0/backend/data/*.db
+
+# Generated backend source artifacts
+0.4.0/backend/src/**/*.js
+0.4.0/backend/src/**/*.js.map
+0.4.0/backend/src/**/*.d.ts
+0.4.0/backend/src/**/*.d.ts.map
 
 # Temporary files
 *.tmp

@@ -5,7 +5,6 @@ import { errorHandler } from './middleware/error-handler.middleware';
 import softwareRoutes from './routes/software.routes'; 
 import usersRoutes from './routes/users.routes';
 import categoriesRoutes from './routes/categories.routes';
-import authRoutes from './routes/auth.routes';
 // Імпортуємо ініціалізатор БД, щоб схема виконалась до старту сервера
 import './db';
 
@@ -14,7 +13,7 @@ const PORT = 3000;
 
 // Express middleware та маршрути налаштовуються нижче
 
-// Конфігурація CORS: дозволені конкретні хости для фронтенд-запитів
+// Дозволяємо запити з браузера з фронтенд-порту
 const corsOptions = {
     origin: [
         'http://localhost:5173',
@@ -26,10 +25,10 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Парсер JSON для всіх вхідних запитів
+// Парсинг JSON
 app.use(express.json());
 
-// Додаткові заголовки безпеки для захисту від типових атак
+// Безпечні HTTP-заголовки для попередження поширених атак
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
@@ -49,10 +48,6 @@ app.get('/health', (req, res) => {
 // Підключення маршрутів для ПЗ
 app.use('/api/software', softwareRoutes);
 app.use('/api/v1/software', softwareRoutes);
-
-// Підключення маршрутів для авторизації
-app.use('/api/auth', authRoutes);
-app.use('/api/v1/auth', authRoutes);
 
 // Підключення маршрутів для користувачів
 app.use('/api/users', usersRoutes);

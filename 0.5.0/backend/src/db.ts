@@ -73,30 +73,47 @@ class DatabaseWrapper {
   }
 
   // Виконує SQL без повернення результатів
-  async exec(sql: string) {
+  async exec(sql: string, params: any[] = []) {
     if (!this.db) {
       await this.readyPromise;
     }
-    this.db.run(sql);
+    if (params.length === 0) {
+      this.db.run(sql);
+    } else {
+      const stmt = this.db.prepare(sql);
+      stmt.bind(params);
+      stmt.step();
+      stmt.free();
+    }
     this.persist();
   }
 
-  async run(sql: string): Promise<RunResult> {
+  async run(sql: string, params: any[] = []): Promise<RunResult> {
     if (!this.db) {
       await this.readyPromise;
     }
-    this.db.run(sql);
+    if (params.length === 0) {
+      this.db.run(sql);
+    } else {
+      const stmt = this.db.prepare(sql);
+      stmt.bind(params);
+      stmt.step();
+      stmt.free();
+    }
     const result = this.db.exec('SELECT changes() AS changes;');
     const changes = result?.[0]?.values?.[0]?.[0] ?? 0;
     this.persist();
     return { changes };
   }
 
-  async get(sql: string) {
+  async get(sql: string, params: any[] = []) {
     if (!this.db) {
       await this.readyPromise;
     }
     const stmt = this.db.prepare(sql);
+    if (params.length > 0) {
+      stmt.bind(params);
+    }
     const hasRow = stmt.step();
     if (!hasRow) {
       stmt.free();
@@ -107,11 +124,14 @@ class DatabaseWrapper {
     return row;
   }
 
-  async all(sql: string) {
+  async all(sql: string, params: any[] = []) {
     if (!this.db) {
       await this.readyPromise;
     }
     const stmt = this.db.prepare(sql);
+    if (params.length > 0) {
+      stmt.bind(params);
+    }
     const rows: any[] = [];
     while (stmt.step()) {
       rows.push(stmt.getAsObject());

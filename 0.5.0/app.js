@@ -136,7 +136,14 @@ function checkAuth() {
 
     if (name) {
         loginScreen.style.display = 'none'; // Ховаємо модалку
-        userEmailDisplay.innerHTML = `Ви увійшли як: &nbsp; ${name} <b>(${role})</b>`;
+        
+        // Безпечне відображення імені користувача без XSS-уязливості
+        userEmailDisplay.innerHTML = '';
+        const textNode = document.createTextNode(`Ви увійшли як: \u00A0${name} `);
+        const roleSpan = document.createElement('strong');
+        roleSpan.textContent = `(${role})`;
+        userEmailDisplay.appendChild(textNode);
+        userEmailDisplay.appendChild(roleSpan);
         
         logoutBtn.innerText = role === 'guest' ? 'Увійти' : 'Вийти';
 

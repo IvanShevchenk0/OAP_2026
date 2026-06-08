@@ -17,7 +17,7 @@ export const authController = {
   login: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { email, password } = req.body;
-      const result = await authService.login(email, password, req.ip);
+      const result = await authService.login(email, password, req.ip ?? '');
       res.status(200).json({ data: result });
     } catch (error) {
       next(error);

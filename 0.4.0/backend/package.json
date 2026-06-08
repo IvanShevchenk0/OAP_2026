@@ -2,11 +2,11 @@
   "name": "oap_2026",
   "version": "1.0.0",
   "description": "",
-  "main": "app.js",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "seed": "tsx src/seed.ts",
-    "build": "tsc",
+    "build": "tsc --project tsconfig.json",
     "start": "node dist/index.js"
   },
   "keywords": [],

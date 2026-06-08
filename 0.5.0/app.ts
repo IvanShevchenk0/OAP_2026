@@ -6,13 +6,6 @@ import type {
     Software
 } from './shared/dtos';
 
-type User = {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-};
-
 // НАЛАШТУВАННЯ ТА URL-АДРЕСИ АРІ
 const API_URL_SOFTWARE = 'http://localhost:3000/api/v1/software';
 const API_URL_USERS = 'http://localhost:3000/api/users';
@@ -25,6 +18,11 @@ const state: {
     license: string;
     users: any[];
     categories: any[];
+    page: number;
+    pageSize: number;
+    sortBy: string;
+    sortOrder: 'asc' | 'desc';
+    totalItems: number;
     itemsStatus: 'idle' | 'loading' | 'loaded' | 'empty' | 'error';
     itemsError: string;
     selectedItem: Software | null;
@@ -36,12 +34,44 @@ const state: {
     license: '',
     users: [],
     categories: [],
+    page: 1,
+    pageSize: 10,
+    sortBy: 'name',
+    sortOrder: 'asc',
+    totalItems: 0,
     itemsStatus: 'idle',
     itemsError: '',
     selectedItem: null,
     selectedItemStatus: 'idle',
     selectedItemError: ''
 };
+
+const CACHE_TTL_MS = 1000 * 60 * 5; // 5 хвилин
+const itemsCache: Record<string, { data: Software[]; total: number; fetchedAt: number }> = {};
+
+function getItemsCacheKey() {
+    return `license=${state.license};page=${state.page};pageSize=${state.pageSize};sortBy=${state.sortBy};sortOrder=${state.sortOrder}`;
+}
+
+function getCachedItems() {
+    const key = getItemsCacheKey();
+    const cached = itemsCache[key];
+    if (!cached) return null;
+    if (Date.now() - cached.fetchedAt > CACHE_TTL_MS) {
+        delete itemsCache[key];
+        return null;
+    }
+    return cached;
+}
+
+function setCachedItems(items: Software[], total: number) {
+    const key = getItemsCacheKey();
+    itemsCache[key] = { data: items, total, fetchedAt: Date.now() };
+}
+
+function invalidateItemsCache() {
+    Object.keys(itemsCache).forEach(key => delete itemsCache[key]);
+}
 
 // ЛОГІКА АВТОРИЗАЦІЇ / РЕЄСТРАЦІЇ / ГОСТЯ
 const loginScreen = document.getElementById('loginScreen') as HTMLElement;
@@ -101,60 +131,52 @@ actionBtn.addEventListener('click', async () => {
     if (!isLoginMode) {
         // Створення нового користувача (Реєстрація)
         const name = loginNameInput.value.trim();
-        if (!name) return alert("Введіть ваше ім'я!");
+        if (!name) return alert("Введіть ваше ім'я!");;
 
         try {
-            // Call server register endpoint. Server returns { user, token }.
-            const payload = await apiClient.create<{ user: User; token: string }>(`${location.origin}/api/auth/register`, {
-                name,
-                email,
-                password
+            const response = await fetch(API_URL_USERS, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, email: email, role: 'user' }) 
             });
 
-            // Store token and basic identity in sessionStorage for UI and future requests
-            const user = payload.data.user;
-            const token = payload.data.token;
-            sessionStorage.setItem('authToken', token);
-            sessionStorage.setItem('currentUserId', user.id);
-            sessionStorage.setItem('currentUserEmail', user.email);
-            sessionStorage.setItem('currentUserName', user.name);
-            sessionStorage.setItem('currentUserRole', user.role);
-            checkAuth();
-        } catch (error) {
-            console.error(error);
-            alert("Помилка реєстрації. Перевірте формат даних.");
-        }
+            if (response.ok) {
+                sessionStorage.setItem('currentUserEmail', email);
+                sessionStorage.setItem('currentUserName', name);
+                sessionStorage.setItem('currentUserRole', 'user'); 
+                checkAuth();
+            } else {
+                alert("Помилка реєстрації. Перевірте формат даних.");
+            }
+        } catch (error) { console.error(error); }
 
     } else {
         // Перевірка існуючого користувача (Вхід)
         try {
-            // Call server login endpoint. Server returns { user, token } on success.
-            const payload = await apiClient.create<{ user: User; token: string }>(`${location.origin}/api/auth/login`, {
-                email,
-                password
-            });
-
-            // Save token and identity to sessionStorage
-            const user = payload.data.user;
-            const token = payload.data.token;
-            sessionStorage.setItem('authToken', token);
-            sessionStorage.setItem('currentUserId', user.id);
-            sessionStorage.setItem('currentUserEmail', user.email);
-            sessionStorage.setItem('currentUserName', user.name);
-            sessionStorage.setItem('currentUserRole', user.role);
-            checkAuth();
-        } catch (error) {
-            console.error(error);
-            const msg = getErrorText(error);
-            alert(msg || "Не вдалося увійти. Перевірте облікові дані.");
-        }
+            const response = await fetch(API_URL_USERS);
+            if (response.ok) {
+                const payload = await response.json();
+                const users: Array<{ email: string; name: string; role: string }> = payload.data || [];
+                const existingUser = users.find(u => u.email === email);
+                
+                if (existingUser) {
+                    sessionStorage.setItem('currentUserEmail', email);
+                    sessionStorage.setItem('currentUserName', existingUser.name);
+                    sessionStorage.setItem('currentUserRole', existingUser.role);
+                    checkAuth();
+                } else {
+                    alert("Користувача не знайдено! Перевірте дані або зареєструйтеся.");
+                }
+            } else {
+                alert("Не вдалося отримати список користувачів. Спробуйте пізніше.");
+            }
+        } catch (error) { console.error(error); }
     }
 });
 
 // Вхід в систему як "Гість"
 guestBtn.addEventListener('click', (e) => {
     e.preventDefault();
-    sessionStorage.setItem('currentUserId', 'guest');
     sessionStorage.setItem('currentUserEmail', 'guest');
     sessionStorage.setItem('currentUserName', 'Гість');
     sessionStorage.setItem('currentUserRole', 'guest');
@@ -168,25 +190,19 @@ function checkAuth() {
 
     if (name) {
         loginScreen.style.display = 'none'; // Ховаємо модалку
-        userEmailDisplay.textContent = '';
-        const label = document.createElement('span');
-        label.textContent = 'Ви увійшли як: ';
-        const identity = document.createElement('strong');
-        identity.textContent = `${name} (${role})`;
-        userEmailDisplay.appendChild(label);
-        userEmailDisplay.appendChild(identity);
+        userEmailDisplay.innerHTML = `Ви увійшли як: &nbsp; ${name} <b>(${role})</b>`;
         
         logoutBtn.innerText = role === 'guest' ? 'Увійти' : 'Вийти';
 
         const isAdmin = role === 'admin';
         const isGuest = role === 'guest';
 
-        // Показуємо або ховаємо елементи інтерфейсу залежно від ролі
+        // Керування відображенням
         document.querySelectorAll<HTMLElement>('.admin-only').forEach(el => el.style.display = isAdmin ? 'block' : 'none');
         document.querySelectorAll<HTMLElement>('.action-column').forEach(el => el.style.display = isAdmin ? 'table-cell' : 'none');
         document.querySelectorAll<HTMLElement>('.hide-for-guest').forEach(el => el.style.display = isGuest ? 'none' : 'block');
 
-        // Завантаження даних після авторизації
+        // Завантажуємо дані з бекенду
         fetchCategories();
         fetchItems();
         fetchUsers();
@@ -196,22 +212,14 @@ function checkAuth() {
 }
 
 // Вихід з кабінету та очищення сесії
-// Logout button: call server to revoke token then clear client state
 logoutBtn.addEventListener('click', () => {
-    (async () => {
-        try {
-            await apiClient.create(`${location.origin}/api/auth/logout`, {});
-        } catch (err) {
-            // ignore errors on logout
-        }
-        sessionStorage.clear();
-        loginEmailInput.value = ''; 
-        loginPasswordInput.value = '';
-        (document.getElementById('loginEmailError') as HTMLElement).innerText = "";
-        (document.getElementById("itemsTableBody") as HTMLElement).innerHTML = "";
-        (document.getElementById("usersTableBody") as HTMLElement).innerHTML = "";
-        checkAuth();
-    })();
+    sessionStorage.clear();
+    loginEmailInput.value = ''; 
+    loginPasswordInput.value = '';
+    (document.getElementById('loginEmailError') as HTMLElement).innerText = "";
+    (document.getElementById("itemsTableBody") as HTMLElement).innerHTML = "";
+    (document.getElementById("usersTableBody") as HTMLElement).innerHTML = "";
+    checkAuth(); 
 });
 
 
@@ -226,44 +234,59 @@ async function fetchItems() {
     state.itemsError = '';
     renderItemsStatus();
 
+    const cached = getCachedItems();
+    if (cached) {
+        state.items = cached.data;
+        state.totalItems = cached.total;
+        state.itemsStatus = state.items.length ? 'loaded' : 'empty';
+        renderItems();
+        renderItemsStatus();
+        renderPaginationControls();
+        return;
+    }
+
     try {
         const url = new URL(API_URL_SOFTWARE);
         if (state.license) url.searchParams.append('license', state.license);
+        url.searchParams.append('page', String(state.page));
+        url.searchParams.append('pageSize', String(state.pageSize));
+        url.searchParams.append('sortBy', state.sortBy);
+        url.searchParams.append('sortOrder', state.sortOrder);
 
         const payload = await apiClient.getList<ApiListResponse<Software>>(url);
         state.items = payload?.data || [];
+        state.totalItems = payload?.meta?.total || 0;
+        setCachedItems(state.items, state.totalItems);
         state.itemsStatus = state.items.length ? 'loaded' : 'empty';
     } catch (error: unknown) {
         state.items = [];
+        state.totalItems = 0;
         state.itemsStatus = 'error';
         state.itemsError = getErrorText(error);
     }
 
     renderItems();
     renderItemsStatus();
+    renderPaginationControls();
 }
 
 // Отримати список категорій (GET /api/categories)
 async function fetchCategories() {
     try {
-        const payload = await apiClient.getList<ApiListResponse<any>>(API_URL_CATEGORIES);
-        state.categories = payload.data || [];
-        populateCategorySelect();
-        if (state.items.length > 0) renderItems();
-    } catch (error) {
-        console.error(error);
-    }
+        const response = await fetch(API_URL_CATEGORIES);
+        if (response.ok) {
+            const categories = await response.json();
+            state.categories = Array.isArray(categories) ? categories : [];
+            populateCategorySelect();
+            if (state.items.length > 0) renderItems();
+        }
+    } catch (error) { console.error(error); }
 }
 
 function populateCategorySelect() {
     const select = document.getElementById('categorySelect') as HTMLSelectElement;
     if (!select) return;
-    select.innerHTML = '';
-    const emptyOption = document.createElement('option');
-    emptyOption.value = '';
-    emptyOption.textContent = 'Оберіть категорію';
-    select.appendChild(emptyOption);
-
+    select.innerHTML = '<option value="">Оберіть категорію</option>';
     state.categories.forEach(category => {
         const option = document.createElement('option');
         option.value = category.id;
@@ -349,6 +372,7 @@ async function addItem(formData: CreateSoftwareDto) {
     try {
         await apiClient.create<ApiItemResponse<Software>>(API_URL_SOFTWARE, formData);
         resetSoftwareForm();
+        invalidateItemsCache();
         fetchItems();
     } catch (error: unknown) {
         console.error(error);
@@ -363,6 +387,7 @@ async function saveEditItem(formData: CreateSoftwareDto) {
     try {
         await apiClient.update<ApiItemResponse<Software>>(API_URL_SOFTWARE, editId, formData);
         resetSoftwareForm();
+        invalidateItemsCache();
         fetchItems();
     } catch (error: unknown) {
         console.error(error);
@@ -375,6 +400,7 @@ async function deleteItem(id: string | null) {
     if (!id) return;
     try {
         await apiClient.remove(API_URL_SOFTWARE, id);
+        invalidateItemsCache();
         fetchItems();
     } catch (error: unknown) {
         console.error(error);
@@ -392,71 +418,67 @@ function renderItems() {
     
     if (filtered.length === 0 && state.itemsStatus === 'loaded') {
         const emptyRow = document.createElement('tr');
-        const emptyCell = document.createElement('td');
-        emptyCell.colSpan = 8;
-        emptyCell.style.textAlign = 'center';
-        emptyCell.style.fontStyle = 'italic';
-        emptyCell.style.color = '#555';
-        emptyCell.textContent = 'Немає записів для відображення.';
-        emptyRow.appendChild(emptyCell);
+        emptyRow.innerHTML = `<td colspan="8" style="text-align:center; font-style:italic; color:#555;">Немає записів для відображення.</td>`;
         tableBody.appendChild(emptyRow);
         return;
     }
 
     filtered.forEach((item) => {
         const row = document.createElement('tr');
+        
+        const actionHtml = isAdmin ? `
+            <td>
+                <button type="button" class="edit-btn" data-id="${item.id}" style="color:#3528a8; border-color:#3528a8;">Редагувати</button>
+                <button type="button" class="delete-btn" data-id="${item.id}" style="color:red; border-color:red;">Видалити</button>
+            </td>
+        ` : '';
 
-        const nameCell = document.createElement('td');
-        nameCell.textContent = item.name;
-        const versionCell = document.createElement('td');
-        versionCell.textContent = item.version;
-        const licenseCell = document.createElement('td');
-        licenseCell.textContent = item.license;
-        const categoryCell = document.createElement('td');
-        categoryCell.textContent = getCategoryName(item.categoryId);
-        const seatsCell = document.createElement('td');
-        seatsCell.textContent = String(item.seats);
-        const commentCell = document.createElement('td');
-        commentCell.textContent = item.comment || '';
-
-        const detailsCell = document.createElement('td');
-        const detailsButton = document.createElement('button');
-        detailsButton.type = 'button';
-        detailsButton.className = 'details-btn';
-        detailsButton.dataset.id = item.id;
-        detailsButton.style.padding = '4px 8px';
-        detailsButton.style.borderColor = '#3528a8';
-        detailsButton.style.color = '#3528a8';
-        detailsButton.style.background = '#fff';
-        detailsButton.textContent = 'Деталі';
-        detailsCell.appendChild(detailsButton);
-
-        row.append(nameCell, versionCell, licenseCell, categoryCell, seatsCell, commentCell, detailsCell);
-
-        if (isAdmin) {
-            const actionsCell = document.createElement('td');
-            const editButton = document.createElement('button');
-            editButton.type = 'button';
-            editButton.className = 'edit-btn';
-            editButton.dataset.id = item.id;
-            editButton.style.color = '#3528a8';
-            editButton.style.borderColor = '#3528a8';
-            editButton.textContent = 'Редагувати';
-
-            const deleteButton = document.createElement('button');
-            deleteButton.type = 'button';
-            deleteButton.className = 'delete-btn';
-            deleteButton.dataset.id = item.id;
-            deleteButton.style.color = 'red';
-            deleteButton.style.borderColor = 'red';
-            deleteButton.textContent = 'Видалити';
-
-            actionsCell.append(editButton, deleteButton);
-            row.appendChild(actionsCell);
-        }
-
+        row.innerHTML = `
+            <td>${item.name}</td>
+            <td>${item.version}</td>
+            <td>${item.license}</td>
+            <td>${getCategoryName(item.categoryId)}</td>
+            <td>${item.seats}</td>
+            <td>${item.comment || ''}</td>
+            <td><button type="button" class="details-btn" data-id="${item.id}" style="padding:4px 8px; border-color:#3528a8; color:#3528a8; background:#fff;">Деталі</button></td>
+            ${actionHtml}
+        `;
         tableBody.appendChild(row);
     });
+}
+
+function renderPaginationControls() {
+    const pagination = document.getElementById('paginationControls') as HTMLElement | null;
+    if (!pagination) return;
+
+    const totalPages = Math.max(1, Math.ceil(state.totalItems / state.pageSize));
+    const currentPage = Math.min(Math.max(1, state.page), totalPages);
+
+    pagination.innerHTML = `
+        <button id="prevPageBtn" type="button" ${currentPage <= 1 ? 'disabled' : ''} style="padding:6px 10px;">Попередня</button>
+        <span style="margin:0 10px;">Сторінка ${currentPage} з ${totalPages}</span>
+        <button id="nextPageBtn" type="button" ${currentPage >= totalPages ? 'disabled' : ''} style="padding:6px 10px;">Наступна</button>
+    `;
+
+    const prevBtn = document.getElementById('prevPageBtn') as HTMLButtonElement | null;
+    const nextBtn = document.getElementById('nextPageBtn') as HTMLButtonElement | null;
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (state.page > 1) {
+                state.page -= 1;
+                fetchItems();
+            }
+        });
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            if (state.page < totalPages) {
+                state.page += 1;
+                fetchItems();
+            }
+        });
+    }
 }
 
 // Заповнення форми даними для редагування ПЗ
@@ -562,50 +584,31 @@ function renderItemDetails() {
 
     if (!detailsContainer) return;
 
-    detailsContainer.textContent = '';
-
     if (state.selectedItemStatus === 'loading') {
-        const loading = document.createElement('p');
-        loading.textContent = 'Завантаження деталей...';
-        detailsContainer.appendChild(loading);
+        detailsContainer.innerHTML = '<p>Завантаження деталей...</p>';
         return;
     }
 
     if (state.selectedItemStatus === 'error') {
-        const errorMessage = document.createElement('p');
-        errorMessage.style.color = 'red';
-        errorMessage.style.fontWeight = 'bold';
-        errorMessage.textContent = `Помилка завантаження деталей: ${state.selectedItemError}`;
-        detailsContainer.appendChild(errorMessage);
+        detailsContainer.innerHTML = `<p style="color:red; font-weight:bold;">Помилка завантаження деталей: ${state.selectedItemError}</p>`;
         return;
     }
 
     if (state.selectedItemStatus === 'empty' || !state.selectedItem) {
-        const empty = document.createElement('p');
-        empty.textContent = 'Деталі не знайдено.';
-        detailsContainer.appendChild(empty);
+        detailsContainer.innerHTML = '<p>Деталі не знайдено.</p>';
         return;
     }
 
     const item = state.selectedItem;
-    const details = [
-        { label: 'Назва', value: item.name || '-' },
-        { label: 'Версія', value: item.version || '-' },
-        { label: 'Ліцензія', value: item.license || '-' },
-        { label: 'Категорія', value: getCategoryName(item.categoryId) || '-' },
-        { label: 'Місця', value: String(item.seats || '-') },
-        { label: 'Коментар', value: item.comment || '-' },
-        { label: 'ID', value: item.id || '-' }
-    ];
-
-    details.forEach(detail => {
-        const row = document.createElement('div');
-        const label = document.createElement('strong');
-        label.textContent = `${detail.label}: `;
-        row.appendChild(label);
-        row.appendChild(document.createTextNode(detail.value));
-        detailsContainer.appendChild(row);
-    });
+    detailsContainer.innerHTML = `
+        <div><strong>Назва:</strong> ${item.name || '-'}</div>
+        <div><strong>Версія:</strong> ${item.version || '-'}</div>
+        <div><strong>Ліцензія:</strong> ${item.license || '-'}</div>
+        <div><strong>Категорія:</strong> ${getCategoryName(item.categoryId) || '-'}</div>
+        <div><strong>Місця:</strong> ${item.seats || '-'}</div>
+        <div><strong>Коментар:</strong> ${item.comment || '-'}</div>
+        <div><strong>ID:</strong> ${item.id || '-'}</div>
+    `;
 }
 
 form.addEventListener("submit", (event) => {
@@ -650,6 +653,31 @@ form.addEventListener("submit", (event) => {
     const target = e.target as HTMLSelectElement | null;
     if (!target) return;
     state.license = target.value;
+    state.page = 1;
+    fetchItems();
+});
+(document.getElementById('sortBySelect') as HTMLSelectElement).addEventListener('change', (e) => {
+    const target = e.target as HTMLSelectElement | null;
+    if (!target) return;
+    state.sortBy = target.value;
+    state.page = 1;
+    invalidateItemsCache();
+    fetchItems();
+});
+(document.getElementById('sortOrderSelect') as HTMLSelectElement).addEventListener('change', (e) => {
+    const target = e.target as HTMLSelectElement | null;
+    if (!target) return;
+    state.sortOrder = target.value as 'asc' | 'desc';
+    state.page = 1;
+    invalidateItemsCache();
+    fetchItems();
+});
+(document.getElementById('pageSizeSelect') as HTMLSelectElement).addEventListener('change', (e) => {
+    const target = e.target as HTMLSelectElement | null;
+    if (!target) return;
+    state.pageSize = Number(target.value) || 10;
+    state.page = 1;
+    invalidateItemsCache();
     fetchItems();
 });
 
@@ -662,55 +690,59 @@ let editUserId: string | null = null; // ID користувача для ред
 // Отримати список користувачів (GET /api/users)
 async function fetchUsers() {
     try {
-        const payload = await apiClient.getList<ApiListResponse<User>>(API_URL_USERS);
-        state.users = payload.data || [];
-        renderUsers();
-    } catch (error) {
-        console.error(error);
-    }
+        const response = await fetch(API_URL_USERS);
+        if (response.ok) {
+            const payload = await response.json();
+            state.users = payload.data || [];
+            renderUsers();
+        }
+    } catch (error) { console.error(error); }
 }
 
 // Створення нового користувача адміном (POST /api/users)
 async function addUser(formData: { name: string; email: string; role: string }) {
     try {
-        await apiClient.create<ApiItemResponse<User>>(API_URL_USERS, formData);
-        fetchUsers();
-    } catch (error) {
-        console.error(error);
-        alert("Помилка валідації користувача!");
-    }
+        const response = await fetch(API_URL_USERS, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        if (response.ok) fetchUsers(); 
+        else alert("Помилка валідації користувача!");
+    } catch (error) { console.error(error); }
 }
 
 // Оновлення ролі або даних користувача (PUT /api/users/:id)
 async function saveEditUser(formData: { name: string; email: string; role: string }) {
     if (!editUserId) return;
     try {
-        await apiClient.update<ApiItemResponse<User>>(API_URL_USERS, editUserId, formData);
-        resetUserForm();
-        fetchUsers();
-        
-        // Якщо адмін відредагував власні дані
-        const currentEmail = sessionStorage.getItem('currentUserEmail');
-        if (formData.email === currentEmail) {
-            sessionStorage.setItem('currentUserName', formData.name);
-            sessionStorage.setItem('currentUserRole', formData.role);
-            checkAuth(); 
-        }
-    } catch (error) {
-        console.error(error);
-        alert("Помилка оновлення користувача!");
-    }
+        const response = await fetch(`${API_URL_USERS}/${editUserId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        if (response.ok) {
+            resetUserForm();
+            fetchUsers();
+            
+            // Якщо адмін відредагував власні дані
+            const currentEmail = sessionStorage.getItem('currentUserEmail');
+            if (formData.email === currentEmail) {
+                sessionStorage.setItem('currentUserName', formData.name);
+                sessionStorage.setItem('currentUserRole', formData.role);
+                checkAuth(); 
+            }
+        } else alert("Помилка оновлення користувача!");
+    } catch (error) { console.error(error); }
 }
 
 // Видалення користувача (DELETE /api/users/:id)
 async function deleteUser(id: string | null) {
     if (!id) return;
     try {
-        await apiClient.remove(API_URL_USERS, id);
-        fetchUsers();
-    } catch (error) {
-        console.error(error);
-    }
+        const response = await fetch(`${API_URL_USERS}/${id}`, { method: 'DELETE' });
+        if (response.ok) fetchUsers();
+    } catch (error) { console.error(error); }
 }
 
 // Відображення списку користувачів у таблиці
@@ -721,39 +753,20 @@ function renderUsers() {
 
     state.users.forEach((user) => {
         const row = document.createElement('tr');
-        const nameCell = document.createElement('td');
-        nameCell.textContent = user.name;
-        const emailCell = document.createElement('td');
-        emailCell.textContent = user.email;
-        const roleCell = document.createElement('td');
-        const roleStrong = document.createElement('strong');
-        roleStrong.textContent = user.role;
-        roleCell.appendChild(roleStrong);
+        
+        const actionHtml = isAdmin ? `
+            <td>
+                <button type="button" class="edit-user-btn" data-id="${user.id}" style="color:#3528a8; border-color:#3528a8;">Редагувати</button>
+                <button type="button" class="delete-user-btn" data-id="${user.id}" style="color:red; border-color:red;">Видалити</button>
+            </td>
+        ` : '';
 
-        row.append(nameCell, emailCell, roleCell);
-
-        if (isAdmin) {
-            const actionsCell = document.createElement('td');
-            const editButton = document.createElement('button');
-            editButton.type = 'button';
-            editButton.className = 'edit-user-btn';
-            editButton.dataset.id = user.id;
-            editButton.style.color = '#3528a8';
-            editButton.style.borderColor = '#3528a8';
-            editButton.textContent = 'Редагувати';
-
-            const deleteButton = document.createElement('button');
-            deleteButton.type = 'button';
-            deleteButton.className = 'delete-user-btn';
-            deleteButton.dataset.id = user.id;
-            deleteButton.style.color = 'red';
-            deleteButton.style.borderColor = 'red';
-            deleteButton.textContent = 'Видалити';
-
-            actionsCell.append(editButton, deleteButton);
-            row.appendChild(actionsCell);
-        }
-
+        row.innerHTML = `
+            <td>${user.name}</td>
+            <td>${user.email}</td>
+            <td><b>${user.role}</b></td>
+            ${actionHtml}
+        `;
         usersTableBody.appendChild(row);
     });
 }

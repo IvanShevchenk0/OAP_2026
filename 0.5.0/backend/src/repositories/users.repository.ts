@@ -2,29 +2,28 @@
 // Реалізація CRUD для `users` через SQLite.
 // Файл БД зберігається в `data/database.db`.
 import { v4 as uuidv4 } from 'uuid';
-import { User, CreateUserDto, UpdateUserDto } from '../dtos/users.dto';
+import { User, StoredUser, CreateUserDto, UpdateUserDto } from '../dtos/users.dto';
 import db from '../db';
 import { ApiError } from '../middleware/error-handler.middleware';
-
-type UserRecord = User & { password_hash?: string | null };
 
 export const usersRepository = {
     getAll: async (): Promise<User[]> => {
         return await db.all('SELECT id, name, email, role FROM users');
     },
 
-    getById: async (id: string): Promise<User | undefined> => {
-        return await db.get(`SELECT id, name, email, role FROM users WHERE id = ${db.escape(id)}`) as User | undefined;
+    getById: async (id: string): Promise<StoredUser | undefined> => {
+        return await db.get(`SELECT id, name, email, role, password_hash FROM users WHERE id = ${db.escape(id)}`) as StoredUser | undefined;
     },
 
-    getByEmail: async (email: string): Promise<UserRecord | undefined> => {
-        return await db.get(`SELECT id, name, email, role, password_hash FROM users WHERE LOWER(email) = LOWER(${db.escape(email)})`) as UserRecord | undefined;
+    getByEmail: async (email: string): Promise<StoredUser | undefined> => {
+        return await db.get(`SELECT id, name, email, role, password_hash FROM users WHERE email = ${db.escape(email)}`) as StoredUser | undefined;
     },
 
     add: async (dto: CreateUserDto): Promise<User> => {
         const id = uuidv4();
+        const passwordHash = dto.passwordHash ?? '';
         try {
-            await db.exec(`INSERT INTO users (id, name, email, role, password_hash) VALUES (${db.escape(id)}, ${db.escape(dto.name)}, ${db.escape(dto.email)}, ${db.escape(dto.role)}, ${db.escape(dto.passwordHash || null)})`);
+            await db.exec(`INSERT INTO users (id, name, email, role, password_hash) VALUES (${db.escape(id)}, ${db.escape(dto.name)}, ${db.escape(dto.email)}, ${db.escape(dto.role)}, ${db.escape(passwordHash)})`);
             return { id, name: dto.name, email: dto.email, role: dto.role };
         } catch (err: any) {
             if (err && (String(err.message).includes('UNIQUE') || String(err.message).includes('constraint failed'))) {
@@ -39,17 +38,7 @@ export const usersRepository = {
         if (!existing) return null;
 
         const updated = { ...existing, ...dto, id } as User;
-        const assignments = [
-            `name = ${db.escape(updated.name)}`,
-            `email = ${db.escape(updated.email)}`,
-            `role = ${db.escape(updated.role)}`
-        ];
-
-        if (dto.passwordHash !== undefined) {
-            assignments.push(`password_hash = ${db.escape(dto.passwordHash)}`);
-        }
-
-        await db.exec(`UPDATE users SET ${assignments.join(', ')} WHERE id = ${db.escape(id)}`);
+        await db.exec(`UPDATE users SET name = ${db.escape(updated.name)}, email = ${db.escape(updated.email)}, role = ${db.escape(updated.role)} WHERE id = ${db.escape(id)}`);
         return updated;
     },
 
@@ -57,7 +46,6 @@ export const usersRepository = {
         const result = await db.run(`DELETE FROM users WHERE id = ${db.escape(id)}`);
         return result.changes > 0;
     },
-
     // JOIN example: отримати користувача та його ПЗ (використовує JOIN)
     getWithSoftware: async (id: string) => {
         const sql = `SELECT u.id as user_id, u.name as user_name, u.email as user_email, u.role as user_role,

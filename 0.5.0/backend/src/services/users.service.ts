@@ -8,10 +8,11 @@ export const usersService = {
     },
 
     getById: async (id: string): Promise<User> => {
-        const user = await usersRepository.getById(id);
-        if (!user) {
+        const storedUser = await usersRepository.getById(id);
+        if (!storedUser) {
             throw new ApiError(404, "NOT_FOUND", `Користувача з id ${id} не знайдено`);
         }
+        const { password_hash, ...user } = storedUser;
         return user;
     },
 

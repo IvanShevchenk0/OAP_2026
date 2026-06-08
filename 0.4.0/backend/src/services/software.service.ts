@@ -1,5 +1,5 @@
 import { softwareRepository } from '../repositories/software.repository';
-import { CreateSoftwareDto, UpdateSoftwareDto, Software } from '../../../shared/dtos';
+import { CreateSoftwareDto, UpdateSoftwareDto, Software } from '../shared/dtos';
 import { ApiError } from '../middleware/error-handler.middleware';
 
 export const softwareService = {

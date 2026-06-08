@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { softwareService } from '../services/software.service';
+import { softwareService, ensureSoftwareAccess } from '../services/software.service';
 
 export const softwareController = {
     // Контролер для роботи з переліком програмного забезпечення
@@ -30,9 +30,19 @@ export const softwareController = {
     getById: async (req: Request, res: Response, next: NextFunction) => {
         try {
             const id = req.params.id as string;
-            const user = req.user;
-            const item = await softwareService.getById(id, user);
+            const item = await ensureSoftwareAccess(id, req.user);
             res.status(200).json({ data: item });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    // Безпечний пошук за запитом (GET /api/software/search)
+    search: async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const q = (req.query.q as string) || '';
+            const items = await softwareService.search(q);
+            res.status(200).json({ data: items, meta: { total: items.length } });
         } catch (error) {
             next(error);
         }
@@ -41,8 +51,7 @@ export const softwareController = {
     // Створення нового запису (POST /api/software)
     create: async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const user = req.user;
-            const newItem = await softwareService.create(req.body, user);
+            const newItem = await softwareService.create(req.body);
             res.status(201).json({ data: newItem });
         } catch (error) {
             next(error);
@@ -53,8 +62,9 @@ export const softwareController = {
     update: async (req: Request, res: Response, next: NextFunction) => {
         try {
             const id = req.params.id as string;
-            const user = req.user;
-            const updatedItem = await softwareService.update(id, req.body, user);
+            // Перевірка IDOR: користувач має право редагувати, тільки якщо він адмін або власник
+            await ensureSoftwareAccess(id, req.user);
+            const updatedItem = await softwareService.update(id, req.body);
             res.status(200).json({ data: updatedItem });
         } catch (error) {
             next(error);
@@ -65,8 +75,9 @@ export const softwareController = {
     delete: async (req: Request, res: Response, next: NextFunction) => {
         try {
             const id = req.params.id as string;
-            const user = req.user;
-            await softwareService.delete(id, user);
+            // Перевірка IDOR: користувач має право видаляти, тільки якщо він адмін або власник
+            await ensureSoftwareAccess(id, req.user);
+            await softwareService.delete(id);
             res.status(204).send();
         } catch (error) {
             next(error);
@@ -88,17 +99,6 @@ export const softwareController = {
         try {
             const q = (req.query.q as string) || '';
             const items = await softwareService.searchUnsafe(q);
-            res.status(200).json({ data: items, meta: { total: items.length } });
-        } catch (err) {
-            next(err);
-        }
-    },
-
-    // Безпечний пошук
-    search: async (req: Request, res: Response, next: NextFunction) => {
-        try {
-            const q = (req.query.q as string) || '';
-            const items = await softwareService.search(q);
             res.status(200).json({ data: items, meta: { total: items.length } });
         } catch (err) {
             next(err);
